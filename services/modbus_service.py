@@ -2,6 +2,7 @@ import serial
 import serial.tools.list_ports
 import threading
 import time
+import queue
 from utils.modbus_utils import build_modbus_ascii_command, parse_modbus_ascii_response
 from utils.address_utils import get_address
 
@@ -26,6 +27,34 @@ class ModbusService:
         self._read_thread = None
         self._lock = threading.Lock()
         self._initialized = True
+
+        # Cola FIFO y worker thread para comandos
+        self.command_queue = queue.Queue()
+        self.worker_thread = threading.Thread(target=self._process_queue, daemon=True)
+        self.worker_thread.start()
+
+    def _process_queue(self):
+        while True:
+            func, args, kwargs, result_queue = self.command_queue.get()
+            print(f"[ModbusService] Ejecutando comando en la cola: {func.__name__}")
+            try:
+                result = func(*args, **kwargs)
+                if result_queue:
+                    result_queue.put(result)
+            except Exception as ex:
+                print(f"[ModbusService] ❌ Error procesando comando: {ex}")
+                if result_queue:
+                    result_queue.put(None)
+            print(f"[ModbusService] Comando finalizado: {func.__name__}")
+            self.command_queue.task_done()
+
+    def enqueue_command(self, func, *args, wait_result=False, **kwargs):
+        """Agrega un comando a la cola. Si wait_result=True, espera y retorna el resultado."""
+        result_queue = queue.Queue() if wait_result else None
+        self.command_queue.put((func, args, kwargs, result_queue))
+        if wait_result:
+            return result_queue.get()
+        return None
 
     def detect_port(self):
         ports = list(serial.tools.list_ports.comports())
@@ -54,7 +83,13 @@ class ModbusService:
             self.serial_port.close()
             self.connected = False
 
+    # --- Métodos Modbus adaptados para usar la cola ---
+
     def send_command(self, command):
+        """Encola el comando y espera la respuesta."""
+        return self.enqueue_command(self._send_command_internal, command, wait_result=True)
+
+    def _send_command_internal(self, command):
         if not self.connected or not self.serial_port:
             return None
         try:
@@ -102,12 +137,12 @@ class ModbusService:
                     int(flow_info['high_byte'], 16), int(flow_info['low_byte'], 16),
                     quantity=6
                 )
-                flow_response = self.send_command(flow_cmd)
+                flow_response = self.enqueue_command(self._send_command_internal, flow_cmd, wait_result=True)
                 flow_data = []
                 if flow_response:
                     parsed = parse_modbus_ascii_response(flow_response, float_byte_order=BYTE_ORDER_FLOAT)
                     flow_data = parsed.get('data', [])
-
+    
                 # Read volume values
                 volume_info = get_address('D', 150)
                 volume_cmd = build_modbus_ascii_command(
@@ -115,26 +150,30 @@ class ModbusService:
                     int(volume_info['high_byte'], 16), int(volume_info['low_byte'], 16),
                     quantity=8
                 )
-                volume_response = self.send_command(volume_cmd)
+                volume_response = self.enqueue_command(self._send_command_internal, volume_cmd, wait_result=True)
                 volume_data = []
                 if volume_response:
                     parsed = parse_modbus_ascii_response(volume_response, float_byte_order=BYTE_ORDER_FLOAT)
                     volume_data = parsed.get('data', [])
-
+    
                 instant_data = flow_data + volume_data
                 if len(instant_data) < 6:
                     instant_data += [0] * (6 - len(instant_data))
-
+    
                 update_ui_callback("instant", {"data": instant_data})
-
+    
                 time.sleep(0.5)
             except Exception as ex:
                 update_ui_callback("log", {"log": f"Error in Modbus read: {ex}"})
 
+
     def send_boolean(self, name, value):
-        """Envía un valor booleano a un registro M específico"""
+        """Encola el envío de un valor booleano a un registro M específico"""
+        return self.enqueue_command(self._send_boolean_internal, name, value, wait_result=True)
+
+    def _send_boolean_internal(self, name, value):
         try:
-            # 🔥 MAPEO CORRECTO DE NOMBRES A DIRECCIONES M
+            print(f"[send_boolean] INICIO: name={name}, value={value}")
             button_mapping = {
                 "Caudal Q1": "M264",
                 "Caudal Q2": "M265", 
@@ -143,154 +182,111 @@ class ModbusService:
                 "Hidrostática": "M268",
                 "Iniciar Prueba": "M269",
                 "Modo Automático": "M271",
-                "Finalizar Prueba": "M270"
+                "Finalizar Prueba": "M270",
+                "Reiniciar": "M263"
             }
-            
-            # 🔥 VERIFICAR QUE EL NOMBRE EXISTE EN EL MAPEO
             if name not in button_mapping:
-                print(f"❌ Botón '{name}' no encontrado en mapeo. Disponibles: {list(button_mapping.keys())}")
+                print(f"[send_boolean] ❌ Botón '{name}' no encontrado en mapeo. Disponibles: {list(button_mapping.keys())}")
                 return False
-                
             address_str = button_mapping[name]
-            print(f"[MODBUS] Enviando {name} -> {address_str} = {value}")
-            
-            # Obtener información de dirección
+            print(f"[send_boolean] [MODBUS] Enviando {name} -> {address_str} = {value}")
             info = get_address('M', int(address_str[1:]))
+            print(f"[send_boolean] Dirección obtenida: {info}")
             if not info:
-                print(f"❌ No se pudo obtener información para {address_str}")
+                print(f"[send_boolean] ❌ No se pudo obtener información para {address_str}")
                 return False
-                
-            # 🔥 FUNCIÓN AUXILIAR PARA ENVIAR COMANDO
             def send_single_command(val):
+                print(f"[send_boolean] Preparando comando para valor: {val}")
                 command = build_modbus_ascii_command(
                     slave_address=self.slave,
-                    function_code=5,  # Write Single Coil
+                    function_code=5,
                     address_high=int(info['high_byte'], 16),
                     address_low=int(info['low_byte'], 16),
                     quantity=1,
                     value=0xFF00 if val else 0x0000,
                     value_type="bool"
                 )
-                return self.send_command(command)
-            
-            # 🔥 ENVIAR EL VALOR SOLICITADO
+                print(f"[send_boolean] Comando generado: {command}")
+                resp = self.send_command(command)
+                print(f"[send_boolean] Respuesta de send_command: {resp}")
+                return resp
+            print(f"[send_boolean] Enviando valor principal: {value}")
             response = send_single_command(value)
+            print(f"[send_boolean] Respuesta tras enviar valor principal: {response}")
             if not response:
-                print(f"[MODBUS] ❌ Error enviando {name} = {value}")
+                print(f"[send_boolean] [MODBUS] ❌ Error enviando {name} = {value}")
                 return False
-                
-            print(f"[MODBUS] ✅ {name} = {value} enviado correctamente")
-            
-            # 🔥 SI SE ENVIÓ TRUE, AUTOMÁTICAMENTE ENVIAR FALSE DESPUÉS
+            print(f"[send_boolean] [MODBUS] ✅ {name} = {value} enviado correctamente")
             if value:
-                time.sleep(0.1)  # Pequeña pausa entre comandos
+                print(f"[send_boolean] Esperando 0.1s antes de enviar FALSE automático...")
+                time.sleep(0.1)
+                print(f"[send_boolean] Enviando FALSE automático...")
                 response_false = send_single_command(False)
+                print(f"[send_boolean] Respuesta tras enviar FALSE automático: {response_false}")
                 if response_false:
-                    print(f"[MODBUS] ✅ {name} = False enviado automáticamente (botón momentáneo)")
+                    print(f"[send_boolean] [MODBUS] ✅ {name} = False enviado automáticamente (botón momentáneo)")
                 else:
-                    print(f"[MODBUS] ⚠️ Error enviando {name} = False automático")
-            
+                    print(f"[send_boolean] [MODBUS] ⚠️ Error enviando {name} = False automático")
+            print(f"[send_boolean] FIN OK")
             return True
-            
         except Exception as ex:
-            print(f"❌ Error en send_boolean para '{name}': {ex}")
+            print(f"[send_boolean] ❌ Error en send_boolean para '{name}': {ex}")
             return False
-
-
-    def send_values(self, field_map, field_widgets, changed_fields, log_callback):
-        for name, (addr, value_type) in field_map.items():
-            if not changed_fields[name]:
-                continue
-            widget = field_widgets[name]
-            value_str = widget.get()
-            try:
-                value = int(float(value_str)) if value_type == "int" else float(value_str)
-            except Exception as e:
-                log_callback(f"⚠️ Invalid value in {name}: {value_str} ({e})")
-                continue
-            info = get_address('D', int(addr[1:]))
-            if not isinstance(info, dict):
-                log_callback(f"❌ Invalid address for {addr}")
-                continue
-            quantity = 1 if value_type == "int" else 2
-            function = 6 if value_type == "int" else 16
-            val_param = value if function == 6 else [value]
-            cmd = build_modbus_ascii_command(
-                self.slave, function,
-                int(info['high_byte'], 16), int(info['low_byte'], 16),
-                quantity=quantity,
-                value=val_param,
-                value_type=value_type,
-                float_byte_order=BYTE_ORDER_FLOAT
-            )
-            self.send_command(cmd)
-            log_callback(f"📤 Writing [{addr}]: {cmd.strip()}")
-
-
+    
     def read_system_status(self):
         """Lee los estados FC0-FC25 (M277-M302) y retorna los mensajes activos"""
         if not self.connected or not self.serial_port:
             return []
-        
         try:
-            with self._lock:
-                # Leer desde M277 hasta M302 (26 bits)
-                info = get_address('M', 277)
-                cmd = build_modbus_ascii_command(
-                    self.slave, 1,  # Función 1 = Read Coils
-                    int(info['high_byte'], 16), int(info['low_byte'], 16),
-                    quantity=26
-                )
-                
-                response = self.send_command(cmd)
-                if not response:
-                    return []
-                    
-                parsed = parse_modbus_ascii_response(response)
-                if parsed.get('type') != 'read' or 'bits' not in parsed:
-                    return []
-                
-                bits = parsed['bits']
-                
-                # Mapeo de FC a mensajes
-                fc_messages = {
-                    0: "✅ Activación de FC0 para selección del modo de trabajo",
-                    1: "📝 Introducción de valores de ratio, Q3 y selección de la prueba",
-                    2: "🔧 Inicio de purga de la línea Q1",
-                    3: "⚙️ Inicio de calibración Q1",
-                    4: "✅ Fin de calibración Q1",
-                    5: "🧪 Inicio de prueba Q1", 
-                    6: "✅ Fin de prueba Q1",
-                    7: "🔧 Inicio de purga de la línea Q2",
-                    8: "⚙️ Inicio de calibración Q2",
-                    9: "✅ Fin de calibración Q2",
-                    10: "🧪 Inicio de prueba Q2",
-                    11: "✅ Fin de prueba Q2",
-                    12: "⚙️ Inicio de calibración Q3",
-                    13: "✅ Fin de calibración Q3",
-                    14: "🧪 Inicio de prueba Q3",
-                    15: "✅ Fin de prueba Q3",
-                    16: "⚙️ Inicio de calibración Q4",
-                    17: "✅ Fin de calibración Q4",
-                    18: "🧪 Inicio de prueba Q4",
-                    19: "✅ Fin de prueba Q4",
-                    20: "💧 Inicio prueba hidrostática",
-                    21: "🔚 Fin de prueba, cierre de válvula de entrada de forma manual",
-                    22: "⚡ Apagado del variador, inicia la prueba",
-                    23: "⏳ Estado de espera, vuelta a inicio de la selección de la prueba",
-                    24: "🔧 Inicio modo mantenimiento en modo manual",
-                    25: "✅ Fin modo mantenimiento en modo manual"
-                }
-                
-                # Recopilar mensajes activos
-                active_messages = []
-                for i, bit_value in enumerate(bits[:26]):  # Solo los primeros 26 bits
-                    if bit_value and i in fc_messages:
-                        active_messages.append(fc_messages[i])
-                
-                return active_messages
-                
+            # Leer desde M277 hasta M302 (26 bits)
+            info = get_address('M', 277)
+            cmd = build_modbus_ascii_command(
+                self.slave, 1,  # Función 1 = Read Coils
+                int(info['high_byte'], 16), int(info['low_byte'], 16),
+                quantity=26
+            )
+            response = self.send_command(cmd)  # Esto ya pasa por la cola FIFO
+            if not response:
+                return []
+            parsed = parse_modbus_ascii_response(response)
+            if parsed.get('type') != 'read' or 'bits' not in parsed:
+                return []
+            bits = parsed['bits']
+            # Mapeo de FC a mensajes
+            fc_messages = {
+                0: "✅ Activación de FC0 para selección del modo de trabajo",
+                1: "📝 Introducción de valores de ratio, Q3 y selección de la prueba",
+                2: "🔧 Inicio de purga de la línea Q1",
+                3: "⚙️ Inicio de calibración Q1",
+                4: "✅ Fin de calibración Q1",
+                5: "🧪 Inicio de prueba Q1", 
+                6: "✅ Fin de prueba Q1",
+                7: "🔧 Inicio de purga de la línea Q2",
+                8: "⚙️ Inicio de calibración Q2",
+                9: "✅ Fin de calibración Q2",
+                10: "🧪 Inicio de prueba Q2",
+                11: "✅ Fin de prueba Q2",
+                12: "⚙️ Inicio de calibración Q3",
+                13: "✅ Fin de calibración Q3",
+                14: "🧪 Inicio de prueba Q3",
+                15: "✅ Fin de prueba Q3",
+                16: "⚙️ Inicio de calibración Q4",
+                17: "✅ Fin de calibración Q4",
+                18: "🧪 Inicio de prueba Q4",
+                19: "✅ Fin de prueba Q4",
+                20: "💧 Inicio prueba hidrostática",
+                21: "🔚 Fin de prueba, cierre de válvula de entrada de forma manual",
+                22: "⚡ Apagado del variador, inicia la prueba",
+                23: "⏳ Estado de espera, vuelta a inicio de la selección de la prueba",
+                24: "🔧 Inicio modo mantenimiento en modo manual",
+                25: "✅ Fin modo mantenimiento en modo manual"
+            }
+            # Recopilar mensajes activos
+            active_messages = []
+            for i, bit_value in enumerate(bits[:26]):  # Solo los primeros 26 bits
+                if bit_value and i in fc_messages:
+                    active_messages.append(fc_messages[i])
+            return active_messages
         except Exception as e:
             print(f"❌ Error leyendo estados del sistema: {e}")
             return []
-    

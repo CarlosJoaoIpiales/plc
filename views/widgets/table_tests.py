@@ -6,7 +6,6 @@ INPUT_BG = "#f3f4f6"
 def table_tests():
     rows = [["", "", DROPDOWN_OPTIONS[0], "", "", "", "", ""]]
 
-    # Cambiar el valor predeterminado de 'value' a "Escoja una opción"
     meter_status_dropdown = ft.Dropdown(
         label="Estado del medidor",
         options=[ft.dropdown.Option("Escoja una opción"), ft.dropdown.Option("Nuevo"), ft.dropdown.Option("Usado")],
@@ -73,7 +72,6 @@ def table_tests():
             return 0, "Error", "gray"
 
     def update_table():
-        # ✅ VERIFICAR SI LA TABLA ESTÁ EN LA PÁGINA ANTES DE ACTUALIZAR
         try:
             data_rows = []
             for idx, row in enumerate(rows):
@@ -109,13 +107,13 @@ def table_tests():
                             bgcolor=INPUT_BG,
                             border="none",
                         ),
-                        width=200,
+                        width=120,
                         padding=0
                     )),
                     ft.DataCell(ft.Container(
                         ft.TextField(
                             value=row[3],
-                            on_blur=lambda e, row_idx=idx: on_text_change(e, row_idx, 3),
+                            on_change=lambda e, row_idx=idx: on_text_change(e, row_idx, 3),
                             keyboard_type=ft.KeyboardType.NUMBER,
                             input_filter=ft.InputFilter(allow=True, regex_string=r"^\d*\.?\d*$"),
                             dense=True,
@@ -124,13 +122,13 @@ def table_tests():
                             filled=True,
                             bgcolor=INPUT_BG,
                         ),
-                        width=120,
+                        width=90,
                         padding=0
                     )),
                     ft.DataCell(ft.Container(
                         ft.TextField(
                             value=row[4],
-                            on_blur=lambda e, row_idx=idx: on_text_change(e, row_idx, 4),
+                            on_change=lambda e, row_idx=idx: on_text_change(e, row_idx, 4),
                             keyboard_type=ft.KeyboardType.NUMBER,
                             input_filter=ft.InputFilter(allow=True, regex_string=r"^\d*\.?\d*$"),
                             dense=True,
@@ -139,7 +137,7 @@ def table_tests():
                             filled=True,
                             bgcolor=INPUT_BG,
                         ),
-                        width=120,
+                        width=90,
                         padding=0
                     )),
                     ft.DataCell(ft.Text(str(error), weight="bold")),
@@ -160,7 +158,6 @@ def table_tests():
             
             data_table.rows = data_rows
             
-            # ✅ SOLO ACTUALIZAR SI LA TABLA TIENE UNA PÁGINA ASIGNADA
             if hasattr(data_table, 'page') and data_table.page is not None:
                 data_table.update()
             
@@ -178,8 +175,7 @@ def table_tests():
 
     def on_text_change(e, row_idx, col_idx):
         rows[row_idx][col_idx] = e.control.value
-        if col_idx in [3, 4]:
-            update_table()
+        # No llamar a update_table aquí para columnas 3 y 4
 
     def on_dropdown_change(e, row_idx):
         rows[row_idx][2] = e.control.value
@@ -192,7 +188,6 @@ def table_tests():
 
     meter_status_dropdown.on_change = on_meter_status_change
 
-    # 🔥 FUNCIÓN PARA ACTUALIZAR VALORES INSTANTÁNEOS
     def update_instant_values(q1, q2, q3, q4):
         print(f"[TABLE_TESTS] 📥 Recibiendo volúmenes instantáneos:")
         print(f"  🔵 Q1: {q1}")
@@ -200,24 +195,20 @@ def table_tests():
         print(f"  🟢 Q3: {q3}")
         print(f"  🔴 Q4: {q4}")
         
-        # Actualizar valores instantáneos
         old_values = instant_values.copy()
         instant_values["Q1"] = max(q1, 0.1)
         instant_values["Q2"] = max(q2, 0.1)
         instant_values["Q3"] = max(q3, 0.1)
         instant_values["Q4"] = max(q4, 0.1)
         
-        # 🔥 MOSTRAR CAMBIOS EN LOS VALORES
         print(f"[TABLE_TESTS] 🔄 Actualizando valores patrón:")
         for key in ["Q1", "Q2", "Q3", "Q4"]:
             if old_values[key] != instant_values[key]:
                 print(f"  {key}: {old_values[key]:.2f} → {instant_values[key]:.2f}")
         
-        # Recalcular errores con nuevos valores
         print(f"[TABLE_TESTS] 🔄 Recalculando tabla con nuevos volúmenes...")
         update_table()
 
-    # ✅ CREAR LA ESTRUCTURA PRIMERO, LUEGO ACTUALIZAR
     table_container = ft.Container(
         content=ft.Column(
             controls=[data_table], 
@@ -246,15 +237,12 @@ def table_tests():
     horizontal_alignment=ft.CrossAxisAlignment.CENTER
     )
 
-    # ✅ FUNCIÓN PARA INICIALIZAR LA TABLA DESPUÉS DE AGREGARSE A LA PÁGINA
     def initialize_table():
-        """Inicializa la tabla con datos después de que se agrega a la página"""
         try:
             update_table()
         except Exception as e:
             print(f"❌ Error inicializando tabla: {e}")
 
-    # 🔥 ASIGNAR MÉTODOS AL COMPONENTE QUE SE DEVUELVE (main_column)
     main_column.actualizar_valores_instantaneos = update_instant_values
     main_column.initialize_table = initialize_table
 

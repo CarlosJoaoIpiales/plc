@@ -165,7 +165,6 @@ def get_mode_selection_view(on_auto, on_manual):
                 1, 5, int(info['high_byte'], 16), int(info['low_byte'], 16), value=0)
             service = ModbusService()
             service.send_command(comand_on)
-            time.sleep(0.1)
             service.send_command(comand_off)
             print(f"[MODBUS] Bit M{bit} activado/desactivado")
             
@@ -242,9 +241,9 @@ def get_mode_selection_view(on_auto, on_manual):
 
     seguridad_buttons_column = ft.Column(
         [
-            ft.ElevatedButton("🔴 Parada de Emergencia", width=button_width, color="white", bgcolor="red",
+            ft.ElevatedButton("Parada de Emergencia", width=button_width, color="white", bgcolor="red",
                               on_click=emergency_stop),
-            ft.ElevatedButton("🔁 Rearme", width=button_width, color="white", bgcolor="green",
+            ft.ElevatedButton("Reiniciar", width=button_width, color="white", bgcolor="green",
                               on_click=rearme),
         ],
         alignment="center",

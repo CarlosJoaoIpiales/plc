@@ -1,11 +1,30 @@
 import flet as ft
+import threading
 from controllers.modbus_controller import ModbusController
 from utils.modbus_utils import build_modbus_ascii_command, parse_modbus_ascii_response
 from utils.address_utils import get_address
 from .widgets.table_tests import table_tests
+from services.modbus_service import ModbusService
+
+def send_bool_m(bit, update_messages_ui, read_fc_states):
+    try:
+        info = get_address('M', bit)
+        comand_on = build_modbus_ascii_command(
+            1, 5, int(info['high_byte'], 16), int(info['low_byte'], 16), value=1)
+        comand_off = build_modbus_ascii_command(
+            1, 5, int(info['high_byte'], 16), int(info['low_byte'], 16), value=0)
+        service = ModbusService()
+        print(f"[MODBUS] Enviando ON a M{bit}: {comand_on.strip()}")
+        service.send_command(comand_on)
+        print(f"[MODBUS] Enviando OFF a M{bit}: {comand_off.strip()}")
+        service.send_command(comand_off)
+        print(f"[MODBUS] Bit M{bit} activado/desactivado")
+        # Forzar una lectura inmediata después de enviar comando
+        threading.Timer(0.2, lambda: threading.Timer(0.1, lambda: update_messages_ui(read_fc_states())).start()).start()
+    except Exception as ex:
+        print(f"[MODBUS] ❌ Error en send_bool_m para M{bit}: {ex}")
 
 def get_automatic_mode_view(page, meter_group_id, selected_batch):
-
 
     def readonly_input(label):
         return ft.TextField(label=label, width=120, read_only=True, bgcolor="#f0f0f0")
@@ -18,7 +37,7 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
     q1_volume_input = ft.TextField(label="Volumen Q1 (Prueba)", width=120)
     q2_volume_input = ft.TextField(label="Volumen Q2 (Prueba)", width=120)
     q3_volume_input = ft.TextField(label="Volumen Q3 (Prueba)", width=120)
-    q4_volume = readonly_input("Volumen Q4")
+    q4_volume = ft.TextField(label="Volumen Q4 (Prueba)", width=120)
 
     # Instant values
     inst_flow_q1 = readonly_input("Caudal Q1 (Inst.)")
@@ -85,15 +104,11 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
                 print(f"[AUTOMATIC_MODE] ❌ table_widget NO tiene el método actualizar_valores_instantaneos")
                 print(f"[AUTOMATIC_MODE] 🔍 Métodos disponibles: {[attr for attr in dir(table_widget) if not attr.startswith('_')]}")
 
-    # Pulsador button generator
-    def create_test_button(name):
+    # Pulsador button generator usando el número de bit
+    def create_test_button(name, bit):
         def on_click(e):
-            controller.service.send_boolean(name, True)
-            print(f"{name} ON")
-            
-            # ✅ ACTUALIZAR ESTADOS DESPUÉS DE PRESIONAR CUALQUIER BOTÓN
-            update_system_status_from_automatic()
-            
+            print(f"[BOTÓN] Presionado: {name} (M{bit})")
+            send_bool_m(bit, update_system_status_from_automatic, controller.service.read_system_status)
         return ft.ElevatedButton(content=ft.Text(name), width=180, on_click=on_click)
 
     # Setup controller
@@ -126,15 +141,30 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
             except Exception as ex:
                 print(f"Error leyendo caudales de prueba: {ex}")
 
-            info_vols = get_address('D', 112)
-            cmd_vols = build_modbus_ascii_command(1, 3, int(info_vols['high_byte'], 16), int(info_vols['low_byte'], 16), quantity=8)
             try:
-                res_vols = controller.service.send_command(cmd_vols)
-                vol_data = parse_modbus_ascii_response(res_vols)["data"]
-                q1_volume_input.value = int(vol_data[3])
-                q2_volume_input.value = int(vol_data[2])
-                q3_volume_input.value = int(vol_data[1])
-                q4_volume.value = int(vol_data[0])
+                # Q1 - D118
+                info_q1 = get_address('D', 118)
+                cmd_q1 = build_modbus_ascii_command(1, 3, int(info_q1['high_byte'], 16), int(info_q1['low_byte'], 16), quantity=1)
+                res_q1 = controller.service.send_command(cmd_q1)
+                q1_volume_input.value = int(parse_modbus_ascii_response(res_q1)["data"][0])
+            
+                # Q2 - D116
+                info_q2 = get_address('D', 116)
+                cmd_q2 = build_modbus_ascii_command(1, 3, int(info_q2['high_byte'], 16), int(info_q2['low_byte'], 16), quantity=1)
+                res_q2 = controller.service.send_command(cmd_q2)
+                q2_volume_input.value = int(parse_modbus_ascii_response(res_q2)["data"][0])
+            
+                # Q3 - D114
+                info_q3 = get_address('D', 114)
+                cmd_q3 = build_modbus_ascii_command(1, 3, int(info_q3['high_byte'], 16), int(info_q3['low_byte'], 16), quantity=1)
+                res_q3 = controller.service.send_command(cmd_q3)
+                q3_volume_input.value = int(parse_modbus_ascii_response(res_q3)["data"][0])
+            
+                # Q4 - D112
+                info_q4 = get_address('D', 112)
+                cmd_q4 = build_modbus_ascii_command(1, 3, int(info_q4['high_byte'], 16), int(info_q4['low_byte'], 16), quantity=1)
+                res_q4 = controller.service.send_command(cmd_q4)
+                q4_volume.value = int(parse_modbus_ascii_response(res_q4)["data"][0])
             except Exception as ex:
                 print(f"Error leyendo volúmenes de prueba: {ex}")
 
@@ -151,10 +181,11 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
                 ("Volumen Q1 (Prueba)", q1_volume_input, "D118", "int"),
                 ("Volumen Q2 (Prueba)", q2_volume_input, "D116", "int"),
                 ("Volumen Q3 (Prueba)", q3_volume_input, "D114", "int"),
+                ("Volumen Q4 (Prueba)", q4_volume, "D112", "int"),
             ]
             for name, widget, address, type_value in campos:
                 value = widget.value
-                if value.strip() == "":
+                if str(value).strip() == "":
                     continue
                 try:
                     val = int(float(value)) if type_value == "int" else float(value)
@@ -221,13 +252,13 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
         inst_vol_q4,
     ], spacing=10, alignment="center", horizontal_alignment="center")
 
-    # Footer buttons
+    # Footer buttons con número de bit/dispositivo
     footer = ft.Column([
         ft.Text("⚙️ Controles de prueba", weight="bold", text_align="center"),
         ft.Row([
-            ft.Column([create_test_button("Caudal Q1"), create_test_button("Caudal Q2")], spacing=10, expand=1),
-            ft.Column([create_test_button("Caudal Q3"), create_test_button("Caudal Q4")], spacing=10, expand=1),
-            ft.Column([create_test_button("Hidrostática"), create_test_button("Iniciar Prueba")], spacing=10, expand=1),
+            ft.Column([create_test_button("Caudal Q1", 264), create_test_button("Caudal Q2", 265)], spacing=10, expand=1),
+            ft.Column([create_test_button("Caudal Q3", 266), create_test_button("Caudal Q4", 267)], spacing=10, expand=1),
+            ft.Column([create_test_button("Hidrostática", 268), create_test_button("Iniciar Prueba", 269)], spacing=10, expand=1),
             ft.Column([finish_button], horizontal_alignment="end", expand=1),
         ], alignment="spaceBetween", spacing=20)
     ], spacing=10)
