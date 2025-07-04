@@ -56,12 +56,20 @@ def table_tests():
             status = meter_status_dropdown.value
             tolerance = 5.0 if status == "Nuevo" else 10.0 if test_type == "Q1" else 4.0
 
-            print(f"[CÁLCULO] Tipo: {test_type} | Start: {start} | End: {end} | Pattern: {pattern} | Error: {error:.2f}%")
+            # 🔥 LOGS DETALLADOS
+            print(f"[TABLE_TESTS] 🧮 Calculando error:")
+            print(f"  📝 Tipo de prueba: {test_type}")
+            print(f"  📊 Lectura inicial: {start}")
+            print(f"  📊 Lectura final: {end}")
+            print(f"  📊 Volumen patrón (instantáneo): {pattern}")
+            print(f"  📊 Error calculado: {error:.2f}%")
+            print(f"  📊 Tolerancia aplicada: {tolerance}%")
+            print(f"  📊 Estado del medidor: {status}")
 
             return round(error, 2), "PASA" if abs(error) <= tolerance else "NO PASA", \
                 "green" if abs(error) <= tolerance else "red"
         except Exception as e:
-            print(f"[ERROR] Calcular error: {e}")
+            print(f"[TABLE_TESTS] ❌ Error calculando: {e}")
             return 0, "Error", "gray"
 
     def update_table():
@@ -175,6 +183,8 @@ def table_tests():
 
     def on_dropdown_change(e, row_idx):
         rows[row_idx][2] = e.control.value
+        print(f"[TABLE_TESTS] 🔄 Tipo de prueba cambiado en fila {row_idx}: {e.control.value}")
+        print(f"[TABLE_TESTS] 📊 Volumen patrón para {e.control.value}: {instant_values.get(e.control.value, 0)}")
         update_table()
 
     def on_meter_status_change(e):
@@ -182,14 +192,30 @@ def table_tests():
 
     meter_status_dropdown.on_change = on_meter_status_change
 
+    # 🔥 FUNCIÓN PARA ACTUALIZAR VALORES INSTANTÁNEOS
     def update_instant_values(q1, q2, q3, q4):
+        print(f"[TABLE_TESTS] 📥 Recibiendo volúmenes instantáneos:")
+        print(f"  🔵 Q1: {q1}")
+        print(f"  🟡 Q2: {q2}")  
+        print(f"  🟢 Q3: {q3}")
+        print(f"  🔴 Q4: {q4}")
+        
+        # Actualizar valores instantáneos
+        old_values = instant_values.copy()
         instant_values["Q1"] = max(q1, 0.1)
         instant_values["Q2"] = max(q2, 0.1)
         instant_values["Q3"] = max(q3, 0.1)
         instant_values["Q4"] = max(q4, 0.1)
+        
+        # 🔥 MOSTRAR CAMBIOS EN LOS VALORES
+        print(f"[TABLE_TESTS] 🔄 Actualizando valores patrón:")
+        for key in ["Q1", "Q2", "Q3", "Q4"]:
+            if old_values[key] != instant_values[key]:
+                print(f"  {key}: {old_values[key]:.2f} → {instant_values[key]:.2f}")
+        
+        # Recalcular errores con nuevos valores
+        print(f"[TABLE_TESTS] 🔄 Recalculando tabla con nuevos volúmenes...")
         update_table()
-
-    data_table.actualizar_valores_instantaneos = update_instant_values
 
     # ✅ CREAR LA ESTRUCTURA PRIMERO, LUEGO ACTUALIZAR
     table_container = ft.Container(
@@ -228,7 +254,8 @@ def table_tests():
         except Exception as e:
             print(f"❌ Error inicializando tabla: {e}")
 
-    # ✅ AGREGAR FUNCIÓN DE INICIALIZACIÓN AL COMPONENTE PRINCIPAL
+    # 🔥 ASIGNAR MÉTODOS AL COMPONENTE QUE SE DEVUELVE (main_column)
+    main_column.actualizar_valores_instantaneos = update_instant_values
     main_column.initialize_table = initialize_table
 
     return main_column

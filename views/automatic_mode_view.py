@@ -5,19 +5,19 @@ from utils.address_utils import get_address
 from .widgets.table_tests import table_tests
 
 def get_automatic_mode_view(page, meter_group_id, selected_batch):
-    # Editable fields
-    ratio_input = ft.TextField(label="Ratio", width=120)
-    q3_flow_input = ft.TextField(label="Caudal Q3 (Prueba)", width=120)
-    q1_volume_input = ft.TextField(label="Volumen Q1 (Prueba)", width=120)
-    q2_volume_input = ft.TextField(label="Volumen Q2 (Prueba)", width=120)
-    q3_volume_input = ft.TextField(label="Volumen Q3 (Prueba)", width=120)
+
 
     def readonly_input(label):
         return ft.TextField(label=label, width=120, read_only=True, bgcolor="#f0f0f0")
-
+    # Editable fields
+    ratio_input = ft.TextField(label="Ratio", width=120)
     q1_flow = readonly_input("Caudal Q1")
     q2_flow = readonly_input("Caudal Q2")
+    q3_flow_input = ft.TextField(label="Caudal Q3 (Prueba)", width=120)
     q4_flow = readonly_input("Caudal Q4")
+    q1_volume_input = ft.TextField(label="Volumen Q1 (Prueba)", width=120)
+    q2_volume_input = ft.TextField(label="Volumen Q2 (Prueba)", width=120)
+    q3_volume_input = ft.TextField(label="Volumen Q3 (Prueba)", width=120)
     q4_volume = readonly_input("Volumen Q4")
 
     # Instant values
@@ -29,17 +29,14 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
     inst_vol_q3 = readonly_input("Volumen Q3 (Inst.)")
     inst_vol_q4 = readonly_input("Volumen Q4 (Inst.)")
 
-    # Pulsador button generator
-    def create_test_button(name):
-        def on_click(e):
-            controller.service.send_boolean(name, True)
-            print(f"{name} ON")
-            
-            # ✅ ACTUALIZAR ESTADOS DESPUÉS DE PRESIONAR CUALQUIER BOTÓN
-            update_system_status_from_automatic()
-            
-        return ft.ElevatedButton(content=ft.Text(name), width=180, on_click=on_click)
+    # ✅ CREAR LA REFERENCIA A LA TABLA AQUÍ (ANTES DE update_ui)
+    table_widget = table_tests()
     
+    # 🔥 DEBUG: Verificar inmediatamente después de crear
+    print(f"[DEBUG] table_widget creado: {type(table_widget)}")
+    print(f"[DEBUG] table_widget tiene método: {hasattr(table_widget, 'actualizar_valores_instantaneos')}")
+    if hasattr(table_widget, 'actualizar_valores_instantaneos'):
+        print(f"[DEBUG] Método es callable: {callable(table_widget.actualizar_valores_instantaneos)}")
 
     # FUNCIÓN PARA ACTUALIZAR ESTADOS DESDE AUTOMATIC MODE
     def update_system_status_from_automatic():
@@ -51,9 +48,10 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
         except Exception as ex:
             print(f"❌ Error actualizando estados desde automatic mode: {ex}")
 
-    # Controller update function
+    # ✅ Controller update function (AHORA table_widget YA ESTÁ DEFINIDA)
     def update_ui(kind, data):
         if kind == "instant" and "data" in data:
+            # Actualizar valores instantáneos en la UI
             inst_flow_q1.value = f"{data['data'][0]:.2f}"
             inst_flow_q2.value = f"{data['data'][1]:.2f}"
             inst_flow_q3.value = f"{data['data'][2]:.2f}"
@@ -62,10 +60,41 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
             inst_vol_q3.value = f"{data['data'][5]:.2f}"
             inst_vol_q4.value = f"{data['data'][6]:.2f}"
             page.update()
+            
+            # 🔥 NUEVO: Imprimir volúmenes enviados a la tabla
+            print(f"[AUTOMATIC_MODE] 📊 Datos instantáneos recibidos:")
+            print(f"  🌊 Caudales: Q1={data['data'][0]:.2f}, Q2={data['data'][1]:.2f}, Q3={data['data'][2]:.2f}")
+            print(f"  💧 Volúmenes: Q1={data['data'][3]:.2f}, Q2={data['data'][4]:.2f}, Q3={data['data'][5]:.2f}, Q4={data['data'][6]:.2f}")
+            
+            # 🔥 DEBUG: Verificar table_widget en tiempo de ejecución
+            print(f"[DEBUG] table_widget disponible: {table_widget is not None}")
+            print(f"[DEBUG] table_widget type: {type(table_widget)}")
+            print(f"[DEBUG] table_widget tiene método: {hasattr(table_widget, 'actualizar_valores_instantaneos')}")
+            
+            # ✅ ENVIAR VOLÚMENES A LA TABLA
             if hasattr(table_widget, 'actualizar_valores_instantaneos'):
-                table_widget.actualizar_valores_instantaneos(
-                    data['data'][3], data['data'][4], data['data'][5], data['data'][6]
-                )
+                print(f"[AUTOMATIC_MODE] 📤 Enviando volúmenes a tabla...")
+                try:
+                    table_widget.actualizar_valores_instantaneos(
+                        data['data'][3], data['data'][4], data['data'][5], data['data'][6]
+                    )
+                    print(f"[AUTOMATIC_MODE] ✅ Volúmenes enviados correctamente a table_tests")
+                except Exception as e:
+                    print(f"[AUTOMATIC_MODE] ❌ Error enviando volúmenes: {e}")
+            else:
+                print(f"[AUTOMATIC_MODE] ❌ table_widget NO tiene el método actualizar_valores_instantaneos")
+                print(f"[AUTOMATIC_MODE] 🔍 Métodos disponibles: {[attr for attr in dir(table_widget) if not attr.startswith('_')]}")
+
+    # Pulsador button generator
+    def create_test_button(name):
+        def on_click(e):
+            controller.service.send_boolean(name, True)
+            print(f"{name} ON")
+            
+            # ✅ ACTUALIZAR ESTADOS DESPUÉS DE PRESIONAR CUALQUIER BOTÓN
+            update_system_status_from_automatic()
+            
+        return ft.ElevatedButton(content=ft.Text(name), width=180, on_click=on_click)
 
     # Setup controller
     controller = ModbusController(update_ui)
@@ -90,10 +119,10 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
             try:
                 res_flows = controller.service.send_command(cmd_flows)
                 flow_data = parse_modbus_ascii_response(res_flows, float_byte_order='little_word')["data"]
-                q1_flow.value = f"{flow_data[3]:.2f}"
-                q2_flow.value = f"{flow_data[2]:.2f}"
-                q3_flow_input.value = f"{flow_data[1]:.2f}"
-                q4_flow.value = f"{flow_data[0]:.2f}"
+                q1_flow.value = flow_data[3]
+                q2_flow.value = flow_data[2]
+                q3_flow_input.value = flow_data[1]
+                q4_flow.value = flow_data[0]
             except Exception as ex:
                 print(f"Error leyendo caudales de prueba: {ex}")
 
@@ -102,17 +131,16 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
             try:
                 res_vols = controller.service.send_command(cmd_vols)
                 vol_data = parse_modbus_ascii_response(res_vols)["data"]
-                q1_volume_input.value = str(vol_data[3])
-                q2_volume_input.value = str(vol_data[2])
-                q3_volume_input.value = str(vol_data[1])
-                q4_volume.value = str(vol_data[0])
+                q1_volume_input.value = int(vol_data[3])
+                q2_volume_input.value = int(vol_data[2])
+                q3_volume_input.value = int(vol_data[1])
+                q4_volume.value = int(vol_data[0])
             except Exception as ex:
                 print(f"Error leyendo volúmenes de prueba: {ex}")
 
             page.update()
         except Exception as e:
             print(f"Error leyendo pruebas volumétricas: {e}")
-
 
     # ---------- BOTÓN ENVIAR VALORES ----------
     def on_send_values(e):
@@ -160,7 +188,6 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
     send_button = ft.ElevatedButton("Enviar valores", width=180, on_click=on_send_values)
     finish_button = ft.ElevatedButton("Finalizar Prueba", width=180)
 
-
     # Columns
     left_column = ft.Column([
         ft.Text("📦 Configuración y Lecturas", weight="bold", text_align="center"),
@@ -177,9 +204,10 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
         send_button
     ], spacing=10, alignment="center", horizontal_alignment="center")
 
+    # ✅ USAR LA VARIABLE table_widget YA DEFINIDA
     center_column = ft.Column([
         ft.Text("📋 Resultados de pruebas", weight="bold", text_align="center"),
-        table_tests()
+        table_widget  # ✅ AQUÍ USAS LA VARIABLE YA CREADA
     ], spacing=15, alignment="center", horizontal_alignment="center")
 
     right_column = ft.Column([

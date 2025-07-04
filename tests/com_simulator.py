@@ -13,6 +13,9 @@ class ModbusSimulator:
         self.holding_registers = {}  # D registers
         self.coil_states = {}       # M registers (bits)
         
+        # Buffer para comandos parciales
+        self.command_buffer = ""
+        
         # Inicializar valores por defecto
         self.init_default_values()
         
@@ -96,6 +99,9 @@ class ModbusSimulator:
                     old_val = struct.unpack('>f', struct.pack('>HH', current[1], current[0]))[0]
                     new_val = old_val + increment
                     self.holding_registers[reg_addr] = self.float_to_registers(new_val)
+                    
+                    # 🔥 LOG para debugging
+                    print(f"[SIMULATOR] 📊 Volumen Q{i+1}: {old_val:.2f} → {new_val:.2f}")
 
     def handle_read_holding_registers(self, start_addr, quantity):
         """Función 3: Leer registros de retención"""
@@ -198,76 +204,129 @@ class ModbusSimulator:
         hex_string = ''.join(f'{b:02X}' for b in response_data) + f'{lrc:02X}'
         return f":{hex_string}\r\n"
 
+    # 🔥 NUEVA FUNCIÓN PARA SEPARAR COMANDOS MÚLTIPLES
+    def extract_commands(self, raw_data):
+        """Extrae comandos individuales de datos concatenados"""
+        self.command_buffer += raw_data
+        commands = []
+        
+        while ':' in self.command_buffer:
+            start_pos = self.command_buffer.find(':')
+            if start_pos == -1:
+                break
+                
+            # Buscar el final del comando (siguiente ':' o fin de buffer)
+            next_start = self.command_buffer.find(':', start_pos + 1)
+            
+            if next_start == -1:
+                # No hay siguiente comando, usar todo el buffer restante
+                if len(self.command_buffer) >= start_pos + 17:  # Comando mínimo completo
+                    command = self.command_buffer[start_pos:start_pos + 17]
+                    commands.append(command)
+                    self.command_buffer = self.command_buffer[start_pos + 17:]
+                else:
+                    # Comando incompleto, esperar más datos
+                    break
+            else:
+                # Hay siguiente comando
+                command = self.command_buffer[start_pos:next_start]
+                if len(command) >= 17:  # Comando completo
+                    commands.append(command)
+                self.command_buffer = self.command_buffer[next_start:]
+        
+        return commands
+
     def parse_command(self, command):
         """Parsea comando Modbus ASCII recibido"""
         try:
             if not command.startswith(':'):
                 return None
+            
+            # Limpiar comando (quitar espacios, \r, \n)
+            clean_command = command.strip().replace('\r', '').replace('\n', '')
+            
+            if len(clean_command) < 9:  # Comando muy corto
+                return None
                 
-            hex_data = command[1:-2]  # Quitar ':' y '\r\n'
+            hex_data = clean_command[1:-2]  # Quitar ':' y LRC (últimos 2 chars)
+            
+            # 🔥 VERIFICAR QUE SOLO CONTIENE CARACTERES HEX VÁLIDOS
+            if not all(c in '0123456789ABCDEFabcdef' for c in hex_data):
+                print(f"❌ Comando contiene caracteres no hexadecimales: {hex_data}")
+                return None
+                
             data_bytes = bytes.fromhex(hex_data)
             
+            if len(data_bytes) < 2:
+                return None
+                
             slave_addr = data_bytes[0]
             function_code = data_bytes[1]
             
             if function_code == 3:  # Read Holding Registers
-                start_addr = (data_bytes[2] << 8) | data_bytes[3]
-                quantity = (data_bytes[4] << 8) | data_bytes[5]
-                return {
-                    'slave': slave_addr,
-                    'function': function_code,
-                    'start_addr': start_addr,
-                    'quantity': quantity
-                }
-                
+                if len(data_bytes) >= 6:
+                    start_addr = (data_bytes[2] << 8) | data_bytes[3]
+                    quantity = (data_bytes[4] << 8) | data_bytes[5]
+                    return {
+                        'slave': slave_addr,
+                        'function': function_code,
+                        'start_addr': start_addr,
+                        'quantity': quantity
+                    }
+                    
             elif function_code == 1:  # Read Coils
-                start_addr = (data_bytes[2] << 8) | data_bytes[3]
-                quantity = (data_bytes[4] << 8) | data_bytes[5]
-                return {
-                    'slave': slave_addr,
-                    'function': function_code,
-                    'start_addr': start_addr,
-                    'quantity': quantity
-                }
-                
+                if len(data_bytes) >= 6:
+                    start_addr = (data_bytes[2] << 8) | data_bytes[3]
+                    quantity = (data_bytes[4] << 8) | data_bytes[5]
+                    return {
+                        'slave': slave_addr,
+                        'function': function_code,
+                        'start_addr': start_addr,
+                        'quantity': quantity
+                    }
+                    
             elif function_code == 5:  # Write Single Coil
-                addr = (data_bytes[2] << 8) | data_bytes[3]
-                value = (data_bytes[4] << 8) | data_bytes[5]
-                return {
-                    'slave': slave_addr,
-                    'function': function_code,
-                    'addr': addr,
-                    'value': value
-                }
-                
+                if len(data_bytes) >= 6:
+                    addr = (data_bytes[2] << 8) | data_bytes[3]
+                    value = (data_bytes[4] << 8) | data_bytes[5]
+                    return {
+                        'slave': slave_addr,
+                        'function': function_code,
+                        'addr': addr,
+                        'value': value
+                    }
+                    
             elif function_code == 6:  # Write Single Register
-                addr = (data_bytes[2] << 8) | data_bytes[3]
-                value = (data_bytes[4] << 8) | data_bytes[5]
-                return {
-                    'slave': slave_addr,
-                    'function': function_code,
-                    'addr': addr,
-                    'value': value
-                }
-                
+                if len(data_bytes) >= 6:
+                    addr = (data_bytes[2] << 8) | data_bytes[3]
+                    value = (data_bytes[4] << 8) | data_bytes[5]
+                    return {
+                        'slave': slave_addr,
+                        'function': function_code,
+                        'addr': addr,
+                        'value': value
+                    }
+                    
             elif function_code == 16:  # Write Multiple Registers
-                addr = (data_bytes[2] << 8) | data_bytes[3]
-                quantity = (data_bytes[4] << 8) | data_bytes[5]
-                byte_count = data_bytes[6]
-                values = []
-                for i in range(0, byte_count, 2):
-                    val = (data_bytes[7 + i] << 8) | data_bytes[7 + i + 1]
-                    values.append(val)
-                return {
-                    'slave': slave_addr,
-                    'function': function_code,
-                    'addr': addr,
-                    'quantity': quantity,
-                    'values': values
-                }
-                
+                if len(data_bytes) >= 7:
+                    addr = (data_bytes[2] << 8) | data_bytes[3]
+                    quantity = (data_bytes[4] << 8) | data_bytes[5]
+                    byte_count = data_bytes[6]
+                    values = []
+                    for i in range(0, byte_count, 2):
+                        if 7 + i + 1 < len(data_bytes):
+                            val = (data_bytes[7 + i] << 8) | data_bytes[7 + i + 1]
+                            values.append(val)
+                    return {
+                        'slave': slave_addr,
+                        'function': function_code,
+                        'addr': addr,
+                        'quantity': quantity,
+                        'values': values
+                    }
+                    
         except Exception as e:
-            print(f"❌ Error parseando comando: {e}")
+            print(f"❌ Error parseando comando '{command}': {e}")
             return None
 
     def process_command(self, parsed_cmd):
@@ -286,6 +345,18 @@ class ModbusSimulator:
                 )
                 byte_count = len(data) * 2
                 data_bytes = [byte_count] + self.registers_to_bytes(data)
+                
+                # 🔥 LOG ESPECIAL PARA VOLÚMENES INSTANTÁNEOS
+                if parsed_cmd['start_addr'] == 150 and parsed_cmd['quantity'] == 4:
+                    print(f"[SIMULATOR] 📊 Enviando volúmenes instantáneos:")
+                    for i in range(4):
+                        addr = 150 + (i * 2)
+                        if addr in self.holding_registers:
+                            vol_data = self.holding_registers[addr]
+                            if isinstance(vol_data, list):
+                                val = struct.unpack('>f', struct.pack('>HH', vol_data[1], vol_data[0]))[0]
+                                print(f"  📊 Q{i+1} Volume: {val:.2f}")
+                
                 return self.create_response(slave, function, data_bytes)
                 
             elif function == 1:  # Read Coils
@@ -370,18 +441,25 @@ def run_simulator():
             
             # Procesar comandos recibidos
             if ser.in_waiting:
-                data = ser.read(100).decode(errors='ignore').strip()
-                if not data:
+                raw_data = ser.read(500).decode(errors='ignore')
+                if not raw_data:
                     continue
 
-                print(f"📥 Recibido: {data}")
+                print(f"📥 Datos brutos recibidos: {repr(raw_data)}")
                 
-                # Parsear y procesar comando
-                parsed_cmd = simulator.parse_command(data)
-                response = simulator.process_command(parsed_cmd)
+                # 🔥 EXTRAER COMANDOS INDIVIDUALES
+                commands = simulator.extract_commands(raw_data)
                 
-                print(f"📤 Enviando: {response.strip()}")
-                ser.write(response.encode('ascii'))
+                for command in commands:
+                    print(f"📥 Procesando comando: {command}")
+                    
+                    # Parsear y procesar comando
+                    parsed_cmd = simulator.parse_command(command)
+                    response = simulator.process_command(parsed_cmd)
+                    
+                    print(f"📤 Enviando: {response.strip()}")
+                    ser.write(response.encode('ascii'))
+                    time.sleep(0.01)  # Pequeña pausa entre respuestas
 
             time.sleep(0.05)
 
@@ -389,7 +467,7 @@ def run_simulator():
         print(f"❌ Error en simulador: {e}")
 
 if __name__ == "__main__":
-    print("🚀 Iniciando simulador COM completo...")
+    print("🚀 Iniciando simulador COM mejorado...")
     print("📋 Funciones simuladas:")
     print("   - Lectura de caudales instantáneos (D136-D141)")
     print("   - Lectura de volúmenes instantáneos (D150-D157)")
@@ -397,5 +475,6 @@ if __name__ == "__main__":
     print("   - Estados FC (M277-M302)")
     print("   - Botones de control (M262-M269)")
     print("   - Valores dinámicos con variaciones aleatorias")
+    print("   - Manejo de comandos concatenados")
     print()
     run_simulator()

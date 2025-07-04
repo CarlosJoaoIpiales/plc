@@ -131,43 +131,70 @@ class ModbusService:
             except Exception as ex:
                 update_ui_callback("log", {"log": f"Error in Modbus read: {ex}"})
 
-    def send_boolean(self, test_name, state: bool):
-        mapping = {
-            "Caudal Q1": "M264",
-            "Caudal Q2": "M265",
-            "Caudal Q3": "M266",
-            "Caudal Q4": "M267",
-            "Hidrostática": "M268",
-            "Iniciar prueba": "M269",
-            "Emergencia": "M262",
-            "Rearme": "M263",
-            "Modo manual": "M270",
-            "Modo automático": "M271"
-        }
-        address_str = mapping.get(test_name)
-        info = get_address('M', int(address_str[1:]))
-        
-        # Verificar si la dirección fue válida
-        if not isinstance(info, dict):
+    def send_boolean(self, name, value):
+        """Envía un valor booleano a un registro M específico"""
+        try:
+            # 🔥 MAPEO CORRECTO DE NOMBRES A DIRECCIONES M
+            button_mapping = {
+                "Caudal Q1": "M264",
+                "Caudal Q2": "M265", 
+                "Caudal Q3": "M266",
+                "Caudal Q4": "M267",
+                "Hidrostática": "M268",
+                "Iniciar Prueba": "M269",
+                "Modo Automático": "M271",
+                "Finalizar Prueba": "M270"
+            }
+            
+            # 🔥 VERIFICAR QUE EL NOMBRE EXISTE EN EL MAPEO
+            if name not in button_mapping:
+                print(f"❌ Botón '{name}' no encontrado en mapeo. Disponibles: {list(button_mapping.keys())}")
+                return False
+                
+            address_str = button_mapping[name]
+            print(f"[MODBUS] Enviando {name} -> {address_str} = {value}")
+            
+            # Obtener información de dirección
+            info = get_address('M', int(address_str[1:]))
+            if not info:
+                print(f"❌ No se pudo obtener información para {address_str}")
+                return False
+                
+            # 🔥 FUNCIÓN AUXILIAR PARA ENVIAR COMANDO
+            def send_single_command(val):
+                command = build_modbus_ascii_command(
+                    slave_address=self.slave,
+                    function_code=5,  # Write Single Coil
+                    address_high=int(info['high_byte'], 16),
+                    address_low=int(info['low_byte'], 16),
+                    quantity=1,
+                    value=0xFF00 if val else 0x0000,
+                    value_type="bool"
+                )
+                return self.send_command(command)
+            
+            # 🔥 ENVIAR EL VALOR SOLICITADO
+            response = send_single_command(value)
+            if not response:
+                print(f"[MODBUS] ❌ Error enviando {name} = {value}")
+                return False
+                
+            print(f"[MODBUS] ✅ {name} = {value} enviado correctamente")
+            
+            # 🔥 SI SE ENVIÓ TRUE, AUTOMÁTICAMENTE ENVIAR FALSE DESPUÉS
+            if value:
+                time.sleep(0.1)  # Pequeña pausa entre comandos
+                response_false = send_single_command(False)
+                if response_false:
+                    print(f"[MODBUS] ✅ {name} = False enviado automáticamente (botón momentáneo)")
+                else:
+                    print(f"[MODBUS] ⚠️ Error enviando {name} = False automático")
+            
+            return True
+            
+        except Exception as ex:
+            print(f"❌ Error en send_boolean para '{name}': {ex}")
             return False
-    
-        # Enviar primer comando (True)
-        cmd = build_modbus_ascii_command(
-            self.slave, 5,
-            int(info['high_byte'], 16), int(info['low_byte'], 16),
-            value=state
-        )
-        self.send_command(cmd)
-    
-        # Cambiar el estado a False y enviar
-        cmd = build_modbus_ascii_command(
-            self.slave, 5,
-            int(info['high_byte'], 16), int(info['low_byte'], 16),
-            value=0  # Valor de "False"
-        )
-        self.send_command(cmd)
-    
-        return True
 
 
     def send_values(self, field_map, field_widgets, changed_fields, log_callback):
