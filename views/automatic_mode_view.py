@@ -19,8 +19,10 @@ def send_bool_m(bit, update_messages_ui, read_fc_states):
         print(f"[MODBUS] Enviando OFF a M{bit}: {comand_off.strip()}")
         service.send_command(comand_off)
         print(f"[MODBUS] Bit M{bit} activado/desactivado")
-        # Forzar una lectura inmediata después de enviar comando
-        threading.Timer(0.2, lambda: threading.Timer(0.1, lambda: update_messages_ui(read_fc_states())).start()).start()
+        
+        # 🔥 LLAMADA SIMPLIFICADA Y DIRECTA
+        threading.Timer(0.3, update_messages_ui).start()
+        
     except Exception as ex:
         print(f"[MODBUS] ❌ Error en send_bool_m para M{bit}: {ex}")
 
@@ -60,17 +62,64 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
     # FUNCIÓN PARA ACTUALIZAR ESTADOS DESDE AUTOMATIC MODE
     def update_system_status_from_automatic():
         try:
+            # 🔥 LEER ESTADOS FC USANDO EL SISTEMA EXISTENTE
             active_messages = controller.service.read_system_status()
-            if active_messages:
-                for msg in active_messages:
+            
+            # 🔥 CONVERTIR A FORMATO ESTÁNDAR SI ES NECESARIO
+            if isinstance(active_messages, dict):
+                messages = active_messages.get('messages', [])
+                end_test_fcs = active_messages.get('end_test_fcs', [])
+            elif isinstance(active_messages, list):
+                messages = active_messages
+                end_test_fcs = []
+                
+                # 🔥 DETECTAR FC DE FIN DE PRUEBA EN LOS MENSAJES
+                for msg in messages:
+                    if "FC6:" in msg and "Fin de prueba Q1" in msg:
+                        end_test_fcs.append({'fc_number': 6, 'test_id': 'Q1'})
+                    elif "FC11:" in msg and "Fin de prueba Q2" in msg:
+                        end_test_fcs.append({'fc_number': 11, 'test_id': 'Q2'})
+                    elif "FC15:" in msg and "Fin de prueba Q3" in msg:
+                        end_test_fcs.append({'fc_number': 15, 'test_id': 'Q3'})
+                    elif "FC19:" in msg and "Fin de prueba Q4" in msg:
+                        end_test_fcs.append({'fc_number': 19, 'test_id': 'Q4'})
+            else:
+                messages = []
+                end_test_fcs = []
+            
+            # 🔥 MOSTRAR MENSAJES NORMALES
+            if messages:
+                for msg in messages:
                     print(f"[STATUS] {msg}")
+            
+            # 🔥 PROCESAR FC DE FIN DE PRUEBA
+            if end_test_fcs:
+                print(f"[AUTOMATIC_MODE] 🏁 Fin de prueba detectado: {[fc['test_id'] for fc in end_test_fcs]}")
+                
+                # Obtener volúmenes instantáneos actuales
+                current_volumes = {
+                    'Q1': float(inst_vol_q1.value) if inst_vol_q1.value else 0.0,
+                    'Q2': float(inst_vol_q2.value) if inst_vol_q2.value else 0.0,
+                    'Q3': float(inst_vol_q3.value) if inst_vol_q3.value else 0.0,
+                    'Q4': float(inst_vol_q4.value) if inst_vol_q4.value else 0.0,
+                }
+                
+                # 🔥 CAPTURAR VOLUMEN PATRÓN PARA CADA PRUEBA FINALIZADA
+                for fc_info in end_test_fcs:
+                    test_id = fc_info['test_id']
+                    final_volume = current_volumes.get(test_id, 0.0)
+                    
+                    if hasattr(table_widget, 'capture_pattern_volume'):
+                        table_widget.capture_pattern_volume(test_id, final_volume)
+                        print(f"[AUTOMATIC_MODE] 💾 Volumen patrón {test_id} capturado: {final_volume:.2f}")
+                        
         except Exception as ex:
             print(f"❌ Error actualizando estados desde automatic mode: {ex}")
 
     # ✅ Controller update function (AHORA table_widget YA ESTÁ DEFINIDA)
     def update_ui(kind, data):
         if kind == "instant" and "data" in data:
-            # Actualizar valores instantáneos en la UI
+            # 🔥 ACTUALIZAR VALORES INSTANTÁNEOS EN UI
             inst_flow_q1.value = f"{data['data'][0]:.2f}"
             inst_flow_q2.value = f"{data['data'][1]:.2f}"
             inst_flow_q3.value = f"{data['data'][2]:.2f}"
@@ -80,35 +129,41 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
             inst_vol_q4.value = f"{data['data'][6]:.2f}"
             page.update()
             
-            # 🔥 NUEVO: Imprimir volúmenes enviados a la tabla
-            print(f"[AUTOMATIC_MODE] 📊 Datos instantáneos recibidos:")
-            print(f"  🌊 Caudales: Q1={data['data'][0]:.2f}, Q2={data['data'][1]:.2f}, Q3={data['data'][2]:.2f}")
-            print(f"  💧 Volúmenes: Q1={data['data'][3]:.2f}, Q2={data['data'][4]:.2f}, Q3={data['data'][5]:.2f}, Q4={data['data'][6]:.2f}")
-            
-            # 🔥 DEBUG: Verificar table_widget en tiempo de ejecución
-            print(f"[DEBUG] table_widget disponible: {table_widget is not None}")
-            print(f"[DEBUG] table_widget type: {type(table_widget)}")
-            print(f"[DEBUG] table_widget tiene método: {hasattr(table_widget, 'actualizar_valores_instantaneos')}")
-            
-            # ✅ ENVIAR VOLÚMENES A LA TABLA
+            # 🔥 ENVIAR VALORES INSTANTÁNEOS A TABLA (SIN FORZAR UPDATE DE TABLA)
             if hasattr(table_widget, 'actualizar_valores_instantaneos'):
-                print(f"[AUTOMATIC_MODE] 📤 Enviando volúmenes a tabla...")
-                try:
-                    table_widget.actualizar_valores_instantaneos(
-                        data['data'][3], data['data'][4], data['data'][5], data['data'][6]
-                    )
-                    print(f"[AUTOMATIC_MODE] ✅ Volúmenes enviados correctamente a table_tests")
-                except Exception as e:
-                    print(f"[AUTOMATIC_MODE] ❌ Error enviando volúmenes: {e}")
-            else:
-                print(f"[AUTOMATIC_MODE] ❌ table_widget NO tiene el método actualizar_valores_instantaneos")
-                print(f"[AUTOMATIC_MODE] 🔍 Métodos disponibles: {[attr for attr in dir(table_widget) if not attr.startswith('_')]}")
+                table_widget.actualizar_valores_instantaneos(
+                    data['data'][3], data['data'][4], data['data'][5], data['data'][6]
+                )
+        
+        elif kind == "log" and "log" in data:
+            # 🔥 MANEJAR LOGS NORMALES
+            print(f"[MODBUS_LOG] {data['log']}")
 
     # Pulsador button generator usando el número de bit
     def create_test_button(name, bit):
         def on_click(e):
             print(f"[BOTÓN] Presionado: {name} (M{bit})")
+            
+            # 🔥 DETECTAR TIPO DE PRUEBA Y NOTIFICAR INICIO
+            test_type_mapping = {
+                264: "Q1",  # Caudal Q1
+                265: "Q2",  # Caudal Q2
+                266: "Q3",  # Caudal Q3
+                267: "Q4",  # Caudal Q4
+            }
+            
+            # 🔥 SI ES UN BOTÓN DE CAUDAL, NOTIFICAR INICIO DE CONFIGURACIÓN
+            if bit in test_type_mapping:
+                test_type = test_type_mapping[bit]
+                print(f"[AUTOMATIC_MODE] 🔧 Configurando prueba: {test_type}")
+                
+                # Notificar a la tabla que se inicia una nueva configuración
+                if hasattr(table_widget, 'notify_test_start'):
+                    table_widget.notify_test_start(test_type)
+            
+            # 🔥 MANTENER EL SISTEMA DE ENVÍO ORIGINAL
             send_bool_m(bit, update_system_status_from_automatic, controller.service.read_system_status)
+            
         return ft.ElevatedButton(content=ft.Text(name), width=180, on_click=on_click)
 
     # Setup controller
@@ -267,13 +322,12 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
         expand=True,
         spacing=10,
         controls=[
-            ft.Container(height=60, border_radius=8),  # Header
+            ft.Container(content=footer, padding=10, border_radius=8),
             ft.Row([
                 ft.Container(content=left_column, padding=10, border_radius=8, expand=1),
                 ft.Container(content=center_column, padding=10, border_radius=8, expand=4),
                 ft.Container(content=right_column, padding=10, border_radius=8, expand=1),
             ], expand=True, spacing=10),
-            ft.Container(content=footer, padding=10, border_radius=8),
         ]
     )
 

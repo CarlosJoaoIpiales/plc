@@ -11,6 +11,13 @@ def main(page: ft.Page):
     page.window.resizable = True
     page.window.maximized = True  # Maximizar la ventana al inicio
 
+    page.fonts = {
+        "Kanit": "https://raw.githubusercontent.com/google/fonts/master/ofl/kanit/Kanit-Bold.ttf",
+        "Open Sans": "/fonts/OpenSans-Regular.ttf"
+    }
+
+    page.theme = ft.Theme(font_family="Open Sans")
+
     def on_connection_ready():
         page.go("/tests")
 

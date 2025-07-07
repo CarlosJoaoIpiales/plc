@@ -245,13 +245,47 @@ class ModbusService:
                 int(info['high_byte'], 16), int(info['low_byte'], 16),
                 quantity=26
             )
+            
+            print(f"[READ_SYSTEM_STATUS] 📤 Enviando comando: {cmd.strip()}")
             response = self.send_command(cmd)  # Esto ya pasa por la cola FIFO
+            
             if not response:
+                print(f"[READ_SYSTEM_STATUS] ❌ No se recibió respuesta")
                 return []
+                
+            print(f"[READ_SYSTEM_STATUS] 📥 Respuesta raw: {response}")
+            
             parsed = parse_modbus_ascii_response(response)
+            print(f"[READ_SYSTEM_STATUS] 🔍 Respuesta parseada: {parsed}")
+            
             if parsed.get('type') != 'read' or 'bits' not in parsed:
+                print(f"[READ_SYSTEM_STATUS] ❌ Formato de respuesta inválido")
                 return []
+                
             bits = parsed['bits']
+            
+            # 🔥 IMPRIMIR TODOS LOS BOOLEANOS RECIBIDOS
+            print(f"[READ_SYSTEM_STATUS] 📊 BOOLEANOS RECIBIDOS (26 bits):")
+            print(f"[READ_SYSTEM_STATUS] 📋 Array completo: {bits}")
+            print(f"[READ_SYSTEM_STATUS] 📏 Longitud: {len(bits)} bits")
+            
+            # 🔥 MOSTRAR CADA BIT CON SU ÍNDICE Y VALOR
+            print(f"[READ_SYSTEM_STATUS] 🔍 DETALLE BIT A BIT:")
+            for i, bit_value in enumerate(bits[:26]):  # Solo los primeros 26 bits
+                status = "✅ ACTIVO" if bit_value else "⭕ INACTIVO"
+                print(f"  FC{i:2d} (M{277+i:3d}): {bit_value} - {status}")
+            
+            # 🔥 MOSTRAR SOLO LOS BITS ACTIVOS
+            active_bits = []
+            for i, bit_value in enumerate(bits[:26]):
+                if bit_value:
+                    active_bits.append(f"FC{i}")
+            
+            if active_bits:
+                print(f"[READ_SYSTEM_STATUS] 🎯 BITS ACTIVOS: {', '.join(active_bits)}")
+            else:
+                print(f"[READ_SYSTEM_STATUS] 🔴 NINGÚN BIT ACTIVO")
+            
             # Mapeo de FC a mensajes
             fc_messages = {
                 0: "✅ Activación de FC0 para selección del modo de trabajo",
@@ -281,12 +315,26 @@ class ModbusService:
                 24: "🔧 Inicio modo mantenimiento en modo manual",
                 25: "✅ Fin modo mantenimiento en modo manual"
             }
+            
             # Recopilar mensajes activos
             active_messages = []
             for i, bit_value in enumerate(bits[:26]):  # Solo los primeros 26 bits
                 if bit_value and i in fc_messages:
                     active_messages.append(fc_messages[i])
+            
+            # 🔥 MOSTRAR MENSAJES ACTIVOS
+            if active_messages:
+                print(f"[READ_SYSTEM_STATUS] 📢 MENSAJES ACTIVOS:")
+                for msg in active_messages:
+                    print(f"  📌 {msg}")
+            else:
+                print(f"[READ_SYSTEM_STATUS] 🔇 NO HAY MENSAJES ACTIVOS")
+                
+            print(f"[READ_SYSTEM_STATUS] ✅ Retornando {len(active_messages)} mensajes")
             return active_messages
+            
         except Exception as e:
             print(f"❌ Error leyendo estados del sistema: {e}")
+            import traceback
+            traceback.print_exc()
             return []
