@@ -28,6 +28,8 @@ def send_bool_m(bit, update_messages_ui, read_fc_states):
 
 def get_automatic_mode_view(page, meter_group_id, selected_batch):
 
+    last_active_test = None
+
     def readonly_input(label):
         return ft.TextField(label=label, width=120, read_only=True, bgcolor="#f0f0f0")
     # Editable fields
@@ -61,65 +63,94 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
 
     # FUNCIÓN PARA ACTUALIZAR ESTADOS DESDE AUTOMATIC MODE
     def update_system_status_from_automatic():
+        """Lee y muestra los estados del sistema"""
+        nonlocal last_active_test
+        
         try:
-            # 🔥 LEER ESTADOS FC USANDO EL SISTEMA EXISTENTE
-            active_messages = controller.service.read_system_status()
+            service = ModbusService()
+            active_messages = service.read_system_status()
             
-            # 🔥 CONVERTIR A FORMATO ESTÁNDAR SI ES NECESARIO
-            if isinstance(active_messages, dict):
-                messages = active_messages.get('messages', [])
-                end_test_fcs = active_messages.get('end_test_fcs', [])
-            elif isinstance(active_messages, list):
-                messages = active_messages
-                end_test_fcs = []
+            if active_messages:
+                status_text = "\n".join(active_messages)
+                system_status_display.value = status_text
                 
-                # 🔥 DETECTAR FC DE FIN DE PRUEBA EN LOS MENSAJES
-                for msg in messages:
-                    if "FC6:" in msg and "Fin de prueba Q1" in msg:
-                        end_test_fcs.append({'fc_number': 6, 'test_id': 'Q1'})
-                    elif "FC11:" in msg and "Fin de prueba Q2" in msg:
-                        end_test_fcs.append({'fc_number': 11, 'test_id': 'Q2'})
-                    elif "FC15:" in msg and "Fin de prueba Q3" in msg:
-                        end_test_fcs.append({'fc_number': 15, 'test_id': 'Q3'})
-                    elif "FC19:" in msg and "Fin de prueba Q4" in msg:
-                        end_test_fcs.append({'fc_number': 19, 'test_id': 'Q4'})
-            else:
-                messages = []
-                end_test_fcs = []
-            
-            # 🔥 MOSTRAR MENSAJES NORMALES
-            if messages:
-                for msg in messages:
-                    print(f"[STATUS] {msg}")
-            
-            # 🔥 PROCESAR FC DE FIN DE PRUEBA
-            if end_test_fcs:
-                print(f"[AUTOMATIC_MODE] 🏁 Fin de prueba detectado: {[fc['test_id'] for fc in end_test_fcs]}")
-                
-                # Obtener volúmenes instantáneos actuales
-                current_volumes = {
-                    'Q1': float(inst_vol_q1.value) if inst_vol_q1.value else 0.0,
-                    'Q2': float(inst_vol_q2.value) if inst_vol_q2.value else 0.0,
-                    'Q3': float(inst_vol_q3.value) if inst_vol_q3.value else 0.0,
-                    'Q4': float(inst_vol_q4.value) if inst_vol_q4.value else 0.0,
-                }
-                
-                # 🔥 CAPTURAR VOLUMEN PATRÓN PARA CADA PRUEBA FINALIZADA
-                for fc_info in end_test_fcs:
-                    test_id = fc_info['test_id']
-                    final_volume = current_volumes.get(test_id, 0.0)
+                # 🔥 DETECTAR QUÉ PRUEBA ESTÁ ACTIVA
+                for message in active_messages:
+                    if "🧪 Inicio de prueba Q1" in message:
+                        last_active_test = "Q1"
+                        print(f"[AUTO_MODE] 🧪 Prueba activa: Q1")
+                    elif "🧪 Inicio de prueba Q2" in message:
+                        last_active_test = "Q2"
+                        print(f"[AUTO_MODE] 🧪 Prueba activa: Q2")
+                    elif "🧪 Inicio de prueba Q3" in message:
+                        last_active_test = "Q3"
+                        print(f"[AUTO_MODE] 🧪 Prueba activa: Q3")
+                    elif "🧪 Inicio de prueba Q4" in message:
+                        last_active_test = "Q4"
+                        print(f"[AUTO_MODE] 🧪 Prueba activa: Q4")
                     
-                    if hasattr(table_widget, 'capture_pattern_volume'):
-                        table_widget.capture_pattern_volume(test_id, final_volume)
-                        print(f"[AUTOMATIC_MODE] 💾 Volumen patrón {test_id} capturado: {final_volume:.2f}")
-                        
-        except Exception as ex:
-            print(f"❌ Error actualizando estados desde automatic mode: {ex}")
+                    # 🔥 DETECTAR TAMBIÉN FIN DE PRUEBA INDIVIDUAL COMO BACKUP
+                    elif "✅ Fin de prueba Q1" in message:
+                        if last_active_test == "Q1":
+                            print(f"[AUTO_MODE] 🏁 FIN DE PRUEBA Q1 DETECTADO")
+                            current_volume = float(inst_vol_q1.value) if inst_vol_q1.value else 0.0
+                            if hasattr(table_widget, 'capture_pattern_volume') and current_volume > 1.0:
+                                print(f"[AUTO_MODE] 🏁 Capturando volumen Q1: {current_volume:.2f}")
+                                table_widget.capture_pattern_volume("Q1", current_volume)
+                                last_active_test = None
+                    
+                    elif "✅ Fin de prueba Q2" in message:
+                        if last_active_test == "Q2":
+                            print(f"[AUTO_MODE] 🏁 FIN DE PRUEBA Q2 DETECTADO")
+                            current_volume = float(inst_vol_q2.value) if inst_vol_q2.value else 0.0
+                            if hasattr(table_widget, 'capture_pattern_volume') and current_volume > 1.0:
+                                print(f"[AUTO_MODE] 🏁 Capturando volumen Q2: {current_volume:.2f}")
+                                table_widget.capture_pattern_volume("Q2", current_volume)
+                                last_active_test = None
+                    
+                    elif "✅ Fin de prueba Q3" in message:
+                        if last_active_test == "Q3":
+                            print(f"[AUTO_MODE] 🏁 FIN DE PRUEBA Q3 DETECTADO")
+                            current_volume = float(inst_vol_q3.value) if inst_vol_q3.value else 0.0
+                            if hasattr(table_widget, 'capture_pattern_volume') and current_volume > 1.0:
+                                print(f"[AUTO_MODE] 🏁 Capturando volumen Q3: {current_volume:.2f}")
+                                table_widget.capture_pattern_volume("Q3", current_volume)
+                                last_active_test = None
+                    
+                    elif "✅ Fin de prueba Q4" in message:  # FC19
+                        if last_active_test == "Q4":
+                            print(f"[AUTO_MODE] 🏁 FIN DE PRUEBA Q4 DETECTADO")
+                            current_volume = float(inst_vol_q4.value) if inst_vol_q4.value else 0.0
+                            if hasattr(table_widget, 'capture_pattern_volume') and current_volume > 1.0:
+                                print(f"[AUTO_MODE] 🏁 Capturando volumen Q4: {current_volume:.2f}")
+                                table_widget.capture_pattern_volume("Q4", current_volume)
+                                last_active_test = None
+                    
+                    # 🔥 BACKUP: DETECTAR FC23 COMO SEGUNDA OPCIÓN
+                    elif "⏳ Estado de espera, vuelta a inicio de la selección de la prueba" in message:
+                        print(f"[AUTO_MODE] 🔄 Detectado FC23 - VUELTA AL INICIO")
+                        if last_active_test and hasattr(table_widget, 'capture_pattern_volume'):
+                            if last_active_test == "Q1":
+                                current_volume = float(inst_vol_q1.value) if inst_vol_q1.value else 0.0
+                            elif last_active_test == "Q2":
+                                current_volume = float(inst_vol_q2.value) if inst_vol_q2.value else 0.0
+                            elif last_active_test == "Q3":
+                                current_volume = float(inst_vol_q3.value) if inst_vol_q3.value else 0.0
+                            elif last_active_test == "Q4":
+                                current_volume = float(inst_vol_q4.value) if inst_vol_q4.value else 0.0
+                            
+                            if current_volume > 1.0:
+                                print(f"[AUTO_MODE] 🏁 Capturando volumen {last_active_test} por FC23: {current_volume:.2f}")
+                                table_widget.capture_pattern_volume(last_active_test, current_volume)
+                            last_active_test = None
+        except Exception as e:
+            print(f"Error actualizando estado del sistema: {e}")
+    
 
     # ✅ Controller update function (AHORA table_widget YA ESTÁ DEFINIDA)
     def update_ui(kind, data):
         if kind == "instant" and "data" in data:
-            # 🔥 ACTUALIZAR VALORES INSTANTÁNEOS EN UI
+            # ACTUALIZAR VALORES INSTANTÁNEOS EN UI
             inst_flow_q1.value = f"{data['data'][0]:.2f}"
             inst_flow_q2.value = f"{data['data'][1]:.2f}"
             inst_flow_q3.value = f"{data['data'][2]:.2f}"
@@ -278,14 +309,15 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
     left_column = ft.Column([
         ft.Text("📦 Configuración y Lecturas", weight="bold", text_align="center"),
         ratio_input,
+        q1_flow,
+        q2_flow,
         q3_flow_input,
+        q4_flow,
         q1_volume_input,
         q2_volume_input,
         q3_volume_input,
-        q1_flow,
-        q2_flow,
-        q4_flow,
         q4_volume,
+        
         ft.Divider(),
         send_button
     ], spacing=10, alignment="center", horizontal_alignment="center")
@@ -299,10 +331,10 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
     right_column = ft.Column([
         ft.Text("📊 Valores instantáneos", weight="bold", text_align="center"),
         inst_flow_q1,
-        inst_vol_q1,
         inst_flow_q2,
-        inst_vol_q2,
         inst_flow_q3,
+        inst_vol_q1,
+        inst_vol_q2,
         inst_vol_q3,
         inst_vol_q4,
     ], spacing=10, alignment="center", horizontal_alignment="center")

@@ -236,7 +236,7 @@ def get_batch_registration_view(page, on_continue):
         })
 
     return ft.Column([
-        ft.Text("Registrar Lote de Medidores", size=24, weight="bold"),
+        ft.Text("Detalles de Medidores", size=24, weight="bold"),
         ft.ResponsiveRow([
             ft.Container(brand, col={"xs":12, "sm":6, "md":4}),
             ft.Container(model, col={"xs":12, "sm":6, "md":4}),

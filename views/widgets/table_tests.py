@@ -6,6 +6,8 @@ INPUT_BG = "#f3f4f6"
 def table_tests():
     # 🔥 ESTRUCTURA DE FILAS: [#, Serial, Tipo, Inicial, Final, Volumen_Patron, Error, Estado]
     rows = []
+    completed_rows = set()  # Índices de filas que ya tienen prueba completada
+    frozen_values = {}
     
     print(f"[TABLE_TESTS] 🚀 Inicializando tabla con {len(rows)} fila(s)")
 
@@ -25,6 +27,27 @@ def table_tests():
         "Q3": 3000.0,
         "Q4": 4000.0,
     }
+
+    def update_ui(kind, data):
+        if kind == "instant" and "data" in data:
+            # 🔥 ACTUALIZAR VALORES GLOBALES
+            instant_values["Q1"] = data['data'][3] if len(data['data']) > 3 else 0.0
+            instant_values["Q2"] = data['data'][4] if len(data['data']) > 4 else 0.0
+            instant_values["Q3"] = data['data'][5] if len(data['data']) > 5 else 0.0
+            instant_values["Q4"] = data['data'][6] if len(data['data']) > 6 else 0.0
+            
+            print(f"[AUTO_MODE] 📊 Valores actualizados: Q1={instant_values['Q1']:.2f}, Q2={instant_values['Q2']:.2f}, Q3={instant_values['Q3']:.2f}, Q4={instant_values['Q4']:.2f}")
+                        
+            # 🔥 ENVIAR VALORES INSTANTÁNEOS A TABLA
+            if hasattr(table_widget, 'actualizar_valores_instantaneos'):
+                table_widget.actualizar_valores_instantaneos(
+                    instant_values["Q1"], instant_values["Q2"], 
+                    instant_values["Q3"], instant_values["Q4"]
+                )
+        
+        elif kind == "log" and "log" in data:
+            print(f"[MODBUS_LOG] {data['log']}")
+
 
     # 🔥 VALORES PATRÓN GUARDADOS (SE GUARDAN AL COMPLETAR PRUEBA)
     saved_pattern_values = {
@@ -86,20 +109,33 @@ def table_tests():
             if test_type == "Escoja una opción":
                 return 0.0
             
-            # 🔥 CONTAR CUÁNTAS PRUEBAS DEL MISMO TIPO HAY ANTES DE ESTA FILA
+            # 🔥 OBTENER EL SERIAL DE LA FILA ACTUAL
+            current_serial = rows[row_idx][1]
+            
+            # 🔥 CONTAR CUÁNTAS PRUEBAS DEL MISMO TIPO Y MISMO SERIAL HAY ANTES DE ESTA FILA
             test_count = 0
-            for i in range(row_idx):
-                if i < len(rows) and rows[i][2] == test_type:
+            for i in range(row_idx + 1):  # Incluir la fila actual
+                if i < len(rows) and rows[i][2] == test_type and rows[i][1] == current_serial:
                     test_count += 1
             
             # 🔥 OBTENER EL VALOR PATRÓN GUARDADO CORRESPONDIENTE
             saved_values = saved_pattern_values.get(test_type, [])
-            if test_count < len(saved_values):
-                return saved_values[test_count]
+            
+            print(f"[TABLE_TESTS] 🔍 Fila {row_idx}: tipo={test_type}, serial={current_serial}, test_count={test_count}")
+            print(f"[TABLE_TESTS] 📚 Valores guardados para {test_type}: {saved_values}")
+            
+            # 🔥 USAR EL ÚLTIMO VALOR GUARDADO SI EXISTE
+            if len(saved_values) > 0:
+                volume_index = min(test_count - 1, len(saved_values) - 1)
+                volume = saved_values[volume_index]
+                print(f"[TABLE_TESTS] 📊 Usando volumen guardado [{volume_index}]: {volume}")
+                return volume
             else:
                 # Si no hay valor guardado, usar el instantáneo actual
-                return instant_values.get(test_type, 0.0)
-                
+                volume = instant_values.get(test_type, 0.0)
+                print(f"[TABLE_TESTS] 📊 Usando volumen instantáneo: {volume}")
+                return volume
+                    
         except Exception as e:
             print(f"[TABLE_TESTS] ❌ Error obteniendo volumen patrón: {e}")
             return 0.0
@@ -160,6 +196,7 @@ def table_tests():
                         ft.TextField(
                             value=row[1],
                             on_change=lambda e, row_idx=idx: on_text_change(e, row_idx, 1),
+                            on_submit=lambda e, row_idx=idx: recalculate_errors(None),  # 🔥 RECALCULAR CON ENTER
                             keyboard_type=ft.KeyboardType.NUMBER,
                             input_filter=ft.InputFilter(allow=True, regex_string=r"^\d*$"),
                             dense=True,
@@ -194,6 +231,7 @@ def table_tests():
                         ft.TextField(
                             value=row[3],
                             on_change=lambda e, row_idx=idx: on_text_change(e, row_idx, 3),
+                            on_submit=lambda e, row_idx=idx: recalculate_errors(None),  # 🔥 RECALCULAR CON ENTER
                             keyboard_type=ft.KeyboardType.NUMBER,
                             input_filter=ft.InputFilter(allow=True, regex_string=r"^\d*\.?\d*$"),
                             dense=True,
@@ -212,6 +250,7 @@ def table_tests():
                         ft.TextField(
                             value=row[4],
                             on_change=lambda e, row_idx=idx: on_text_change(e, row_idx, 4),
+                            on_submit=lambda e, row_idx=idx: recalculate_errors(None),  # 🔥 RECALCULAR CON ENTER
                             keyboard_type=ft.KeyboardType.NUMBER,
                             input_filter=ft.InputFilter(allow=True, regex_string=r"^\d*\.?\d*$"),
                             dense=True,
@@ -322,6 +361,12 @@ def table_tests():
             rows[row_idx][col_idx] = e.control.value
             # 🔥 NO ACTUALIZAR TABLA AUTOMÁTICAMENTE PARA EVITAR PERDER FOCO
 
+    def on_key_press(e, row_idx, col_idx):
+        """Maneja teclas presionadas en los campos"""
+        if e.key == "Enter":
+            print(f"[TABLE_TESTS] ⏎ ENTER presionado en fila {row_idx}, columna {col_idx}")
+            recalculate_errors(None)  # Recalcular cuando se presiona ENTER
+
     def on_dropdown_change(e, row_idx):
         """Maneja cambios en el dropdown de tipo de prueba"""
         if row_idx < len(rows):
@@ -353,22 +398,33 @@ def table_tests():
 
     # 🔥 FUNCIÓN PARA CAPTURAR Y GUARDAR VOLUMEN AL COMPLETAR PRUEBA
     def capture_pattern_volume(test_type, final_volume):
-        nonlocal test_in_progress
+        nonlocal test_in_progress, active_test_type
         
         print(f"[TABLE_TESTS] 🏁 PRUEBA COMPLETADA: {test_type}")
         print(f"[TABLE_TESTS] 💾 Guardando volumen patrón: {final_volume:.2f}")
         
-        # Guardar el volumen patrón final
+        # 🔥 VALIDAR QUE EL VOLUMEN SEA VÁLIDO
+        if final_volume < 1.0:
+            print(f"[TABLE_TESTS] ⚠️ Volumen muy pequeño ({final_volume:.2f}), no guardando")
+            return
+        
+        # 🔥 GUARDAR EL VOLUMEN PATRÓN FINAL
         if test_type in saved_pattern_values:
             saved_pattern_values[test_type].append(final_volume)
             print(f"[TABLE_TESTS] 📚 Histórico {test_type}: {saved_pattern_values[test_type]}")
-        
+            
+            # 🔥 ACTUALIZAR INMEDIATAMENTE TODAS LAS FILAS
+            print(f"[TABLE_TESTS] 🔄 Forzando actualización de tabla...")
+            update_table()
+            
+            # 🔥 FORZAR UPDATE DE LA PÁGINA
+            if hasattr(data_table, 'page') and data_table.page is not None:
+                print(f"[TABLE_TESTS] 🔄 Forzando update de página...")
+                data_table.page.update()
+    
         test_in_progress = False
-        
-        # 🔥 ACTUALIZAR TABLA SOLO CUANDO SE COMPLETA LA PRUEBA
-        print(f"[TABLE_TESTS] 🔄 Actualizando tabla con volumen guardado...")
-        update_table()
-
+        active_test_type = None
+    
     def update_instant_values(q1, q2, q3, q4):
         """Actualiza los valores instantáneos"""
         # 🔥 LOGS REDUCIDOS PARA EVITAR SPAM
@@ -406,8 +462,25 @@ def table_tests():
     # 🔥 FUNCIÓN PARA RECALCULAR ERRORES MANUALMENTE
     def recalculate_errors(e):
         """Recalcula todos los errores y actualiza la tabla"""
-        print(f"[TABLE_TESTS] 🔄 Recalculando errores...")
+        print(f"[TABLE_TESTS] 🔄 Recalculando errores manualmente...")
+        print(f"[TABLE_TESTS] 📊 Valores instantáneos actuales: {instant_values}")
+        print(f"[TABLE_TESTS] 📚 Volúmenes guardados: {saved_pattern_values}")
         update_table()
+    
+        # 🔥 FORZAR UPDATE COMPLETO
+        if hasattr(data_table, 'page') and data_table.page is not None:
+            data_table.page.update()
+
+    def update_status_indicator():
+        """Actualiza el indicador de estado en la UI"""
+        status_text = (
+            f"🔄 Prueba activa: {active_test_type if test_in_progress else 'Ninguna'} | "
+            f"Volúmenes guardados: Q1({len(saved_pattern_values['Q1'])}), Q2({len(saved_pattern_values['Q2'])}), "
+            f"Q3({len(saved_pattern_values['Q3'])}), Q4({len(saved_pattern_values['Q4'])})"
+        )
+        # Actualizar el texto del indicador si existe
+        if hasattr(main_column, 'page') and main_column.page is not None:
+            main_column.page.update()
 
     table_container = ft.Container(
         content=ft.Column(
@@ -431,8 +504,19 @@ def table_tests():
             ft.ElevatedButton("Agregar fila", icon=ft.Icons.ADD, on_click=add_row, width=140),
             meter_status_dropdown,
             ft.ElevatedButton("Ver Histórico", icon=ft.Icons.HISTORY, on_click=show_volume_history, width=140),
-            ft.ElevatedButton("Recalcular", icon=ft.Icons.REFRESH, on_click=recalculate_errors, width=140),
+            ft.Text("💡 Presiona ENTER para recalcular errores", size=12, color=ft.Colors.BLUE_700),
         ], alignment="start", spacing=15),
+        # 🔥 AGREGAR INDICADOR DE ESTADO DE PRUEBA
+        ft.Container(
+            content=ft.Text(
+                f"🔄 Prueba activa: {active_test_type if test_in_progress else 'Ninguna'} | "
+                f"Volúmenes guardados: Q1({len(saved_pattern_values['Q1'])}), Q2({len(saved_pattern_values['Q2'])}), "
+                f"Q3({len(saved_pattern_values['Q3'])}), Q4({len(saved_pattern_values['Q4'])})",
+                size=11,
+                color=ft.Colors.GREY_600
+            ),
+            padding=ft.padding.symmetric(vertical=5)
+        ),
         table_container,
     ], 
     expand=True,

@@ -36,16 +36,16 @@ class ModbusService:
     def _process_queue(self):
         while True:
             func, args, kwargs, result_queue = self.command_queue.get()
-            print(f"[ModbusService] Ejecutando comando en la cola: {func.__name__}")
+            # print(f"[ModbusService] Ejecutando comando en la cola: {func.__name__}")
             try:
                 result = func(*args, **kwargs)
                 if result_queue:
                     result_queue.put(result)
             except Exception as ex:
-                print(f"[ModbusService] ❌ Error procesando comando: {ex}")
+                #print(f"[ModbusService] ❌ Error procesando comando: {ex}")
                 if result_queue:
                     result_queue.put(None)
-            print(f"[ModbusService] Comando finalizado: {func.__name__}")
+            #print(f"[ModbusService] Comando finalizado: {func.__name__}")
             self.command_queue.task_done()
 
     def enqueue_command(self, func, *args, wait_result=False, **kwargs):

@@ -17,7 +17,7 @@ def get_mode_selection_view(on_auto, on_manual):
 
     # Mostrar mensajes de estado (ahora como Column para múltiples mensajes)
     messages_column = ft.Column(
-        controls=[ft.Text("📋 Estado del sistema listo", size=14, selectable=True)],
+        controls=[ft.Text("📋 Estado del sistema listo", size=20, selectable=True)],
         spacing=5,
         scroll=ft.ScrollMode.AUTO,
         height=50  # Altura fija para el scroll
