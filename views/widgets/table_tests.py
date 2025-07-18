@@ -471,17 +471,6 @@ def table_tests():
         if hasattr(data_table, 'page') and data_table.page is not None:
             data_table.page.update()
 
-    def update_status_indicator():
-        """Actualiza el indicador de estado en la UI"""
-        status_text = (
-            f"🔄 Prueba activa: {active_test_type if test_in_progress else 'Ninguna'} | "
-            f"Volúmenes guardados: Q1({len(saved_pattern_values['Q1'])}), Q2({len(saved_pattern_values['Q2'])}), "
-            f"Q3({len(saved_pattern_values['Q3'])}), Q4({len(saved_pattern_values['Q4'])})"
-        )
-        # Actualizar el texto del indicador si existe
-        if hasattr(main_column, 'page') and main_column.page is not None:
-            main_column.page.update()
-
     table_container = ft.Container(
         content=ft.Column(
             controls=[table_with_margin],  # 🔥 USAR EL TABLE CON MARGEN
@@ -504,19 +493,8 @@ def table_tests():
             ft.ElevatedButton("Agregar fila", icon=ft.Icons.ADD, on_click=add_row, width=140),
             meter_status_dropdown,
             ft.ElevatedButton("Ver Histórico", icon=ft.Icons.HISTORY, on_click=show_volume_history, width=140),
-            ft.Text("💡 Presiona ENTER para recalcular errores", size=12, color=ft.Colors.BLUE_700),
         ], alignment="start", spacing=15),
         # 🔥 AGREGAR INDICADOR DE ESTADO DE PRUEBA
-        ft.Container(
-            content=ft.Text(
-                f"🔄 Prueba activa: {active_test_type if test_in_progress else 'Ninguna'} | "
-                f"Volúmenes guardados: Q1({len(saved_pattern_values['Q1'])}), Q2({len(saved_pattern_values['Q2'])}), "
-                f"Q3({len(saved_pattern_values['Q3'])}), Q4({len(saved_pattern_values['Q4'])})",
-                size=11,
-                color=ft.Colors.GREY_600
-            ),
-            padding=ft.padding.symmetric(vertical=5)
-        ),
         table_container,
     ], 
     expand=True,

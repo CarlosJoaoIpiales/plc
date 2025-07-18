@@ -52,8 +52,8 @@ def get_test_full_view(page: ft.Page):
     content = ft.Column([], expand=True)
     def refresh_view():
         if step.current == 1:
-            # content.controls = [get_batch_registration_view(page, on_continue_macro)]
-            content.controls = [get_mode_selection_view(on_auto, on_manual)]
+            content.controls = [get_batch_registration_view(page, on_continue_macro)]
+            #content.controls = [get_mode_selection_view(on_auto, on_manual)]
         elif step.current == 2:
             # En test_view.py o donde corresponda:
             content.controls = [get_mode_selection_view(on_auto, on_manual)]

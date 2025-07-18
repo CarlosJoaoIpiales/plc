@@ -97,20 +97,30 @@ def get_mode_selection_view(on_auto, on_manual):
             return []
 
     # Función para actualizar mensajes en la UI
-    def update_messages_ui(active_messages):
+    def update_messages_ui(active_messages=None):
         """Actualiza la UI con los mensajes activos"""
         try:
+            # 🔥 SI NO SE PROPORCIONAN MENSAJES, LEER DEL PLC
+            if active_messages is None:
+                active_messages = read_fc_states()
+            
             # Limpiar mensajes anteriores (excepto el mensaje inicial si no hay estados activos)
             messages_column.controls.clear()
             
             if active_messages:
                 for msg in active_messages:
                     messages_column.controls.append(
-                        ft.Text(msg, size=12, selectable=True, color=ft.Colors.GREEN)
+                        ft.Text(msg, size=20, selectable=True, color=ft.Colors.GREEN)
                     )
+                    
+                    # 🔥 NUEVA FUNCIONALIDAD: ENVIAR MENSAJES A TRAVÉS DEL TABLE MANAGER
+                    table_manager = get_table_manager()
+                    table_manager.process_calibration_message(msg)
+                    table_manager.process_test_completion_message(msg)
+                    print(f"[MODE_SELECTION] 📡 Mensaje enviado a través del Table Manager: {msg}")
             else:
                 messages_column.controls.append(
-                    ft.Text("📋 Sistema en espera", size=14, color=ft.Colors.GREY)
+                    ft.Text("Sistema en espera", size=14, color=ft.Colors.GREY)
                 )
             
             try:
@@ -147,7 +157,7 @@ def get_mode_selection_view(on_auto, on_manual):
             _reading_status["active"] = True
             monitor_thread = threading.Thread(target=status_monitoring_loop, daemon=True)
             monitor_thread.start()
-            print("✅ Monitoreo de estados FC iniciado")
+            print("Monitoreo de estados FC iniciado")
 
     # Función para detener monitoreo (opcional)
     def stop_status_monitoring():
