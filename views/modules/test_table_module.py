@@ -98,22 +98,58 @@ class TestTableModule:
         )
 
         # 🔥 BOTONES DE CONTROL DE PRUEBA
-        self.start_test_button = ft.ElevatedButton(
-            "▶️ Iniciar Prueba",
-            width=140,
-            bgcolor=ft.Colors.GREEN_600,
-            color="white",
-            on_click=self._on_start_test
-        )
-        
+        self.start_test_button = self.create_test_button("Iniciar Prueba", 269)
+
         self.finish_test_button = ft.ElevatedButton(
-            "⏹️ Finalizar Prueba",
+            "Finalizar Prueba",
             width=140,
             bgcolor=ft.Colors.RED_600,
             color="white",
             disabled=True,
             on_click=self._on_finish_test
         )
+
+
+    def create_test_button(self, name, bit):
+        """🔥 NUEVA FUNCIÓN: Crea botón de prueba que envía comando Modbus"""
+        def on_click(e):
+            print(f"[BOTÓN] Presionado: {name} (M{bit})")
+            
+            # 🔥 MANTENER EL SISTEMA DE ENVÍO ORIGINAL
+            self.send_bool_m(bit)
+            
+        return ft.ElevatedButton(
+            content=ft.Text(name), 
+            width=140,
+            bgcolor=ft.Colors.GREEN_600,
+            color="white",
+            on_click=on_click
+        )
+
+    def send_bool_m(self, bit):
+        try:
+            from utils.address_utils import get_address
+            from utils.modbus_utils import build_modbus_ascii_command
+            from services.modbus_service import ModbusService
+            import threading
+            
+            info = get_address('M', bit)
+            comand_on = build_modbus_ascii_command(
+                1, 5, int(info['high_byte'], 16), int(info['low_byte'], 16), value=1)
+            comand_off = build_modbus_ascii_command(
+                1, 5, int(info['high_byte'], 16), int(info['low_byte'], 16), value=0)
+            service = ModbusService()
+            print(f"[MODBUS] Enviando ON a M{bit}: {comand_on.strip()}")
+            service.send_command(comand_on)
+            print(f"[MODBUS] Enviando OFF a M{bit}: {comand_off.strip()}")
+            service.send_command(comand_off)
+            print(f"[MODBUS] Bit M{bit} activado/desactivado")
+            
+            # 🔥 LLAMADA SIMPLIFICADA Y DIRECTA
+            threading.Timer(0.3).start()
+            
+        except Exception as ex:
+            print(f"[MODBUS] ❌ Error en send_bool_m para M{bit}: {ex}")
 
     def set_modbus_callback(self, callback):
         """🔥 NUEVA FUNCIÓN: Establece el callback para enviar comandos Modbus"""
@@ -1068,7 +1104,6 @@ class TestTableModule:
         )
 
         main_column = ft.Column([
-            ft.Text("📊 Datos de Prueba", size=24, weight="bold", text_align="center"),
             
             # 🔥 FILA ÚNICA CON TODOS LOS BOTONES Y TIMER
             ft.Row([

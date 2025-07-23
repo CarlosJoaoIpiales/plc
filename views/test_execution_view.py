@@ -240,11 +240,11 @@ class TestExecutionView:
         
     def on_timer_finished(self):
         """Se ejecuta cuando termina el timer"""
-        self.show_info("⏰ Tiempo de prueba completado")
+        self.show_info("Tiempo de prueba completado")
         
     def on_table_data_changed(self, data):
         """Se ejecuta cuando cambian los datos de la tabla"""
-        print(f"[TEST_EXEC] 📊 Datos de tabla actualizados: {data}")
+        print(f"[TEST_EXEC] Datos de tabla actualizados: {data}")
         
     def find_next_test_of_type(self, test_type):
         """Encuentra la siguiente prueba pendiente del tipo especificado"""
@@ -307,56 +307,164 @@ class TestExecutionView:
         self.page.snack_bar.open = True
         self.page.update()
 
+    def get_configured_volumes(self):
+        """🔥 NUEVA FUNCIÓN: Obtiene los volúmenes configurados por tipo de prueba"""
+        volumes = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
+        
+        for config in self.test_configurations:
+            test_type = config.get("test_type", "")
+            volume = config.get("volume", 0)
+            
+            # Si hay múltiples configuraciones del mismo tipo, usar la primera
+            if test_type in volumes and volumes[test_type] == 0:
+                volumes[test_type] = volume
+        
+        print(f"[TEST_EXEC] 📦 Volúmenes configurados: {volumes}")
+        return volumes
+
     def create_calculated_flows_display(self):
-        """Crea el display responsivo de caudales calculados"""
+        """🔥 MEJORADA: Crea el display de caudales y volúmenes en toda una fila"""
+        configured_volumes = self.get_configured_volumes()
+        
         return ft.ResponsiveRow([
             ft.Container(
                 content=ft.Column([
-                    ft.Text("Caudales Calculados", size=16, weight="bold", color=ft.Colors.BLUE_700),
+                    ft.Text("Configuración de Pruebas", size=18, weight="bold", color=ft.Colors.BLUE_900, text_align="center"),
+                    
+                    # 🔥 FILA PRINCIPAL CON DOS COLUMNAS
                     ft.ResponsiveRow([
+                        # 🔥 COLUMNA 1: CAUDALES CALCULADOS
                         ft.Container(
                             content=ft.Column([
-                                ft.Text(f"Q1: {self.calculated_flows.get('Q1', 0):.2f} L/h", size=12, weight="bold", color=ft.Colors.BLUE_600),
-                            ], horizontal_alignment="center"),
-                            bgcolor=ft.Colors.BLUE_50,
-                            padding=8,
-                            border_radius=8,
-                            col={"xs": 6, "sm": 3},  # 50% en móvil, 25% en escritorio
+                                ft.Text("Caudales Calculados (L/h)", size=14, weight="bold", color=ft.Colors.BLUE_700, text_align="center"),
+                                ft.ResponsiveRow([
+                                    ft.Container(
+                                        content=ft.Column([
+                                            ft.Text(f"Q1: {self.calculated_flows.get('Q1', 0):.2f}", size=13, weight="bold", color=ft.Colors.BLUE_600, text_align="center"),
+                                        ], horizontal_alignment="center"),
+                                        bgcolor=ft.Colors.BLUE_50,
+                                        padding=10,
+                                        border_radius=8,
+                                        border=ft.border.all(1, ft.Colors.BLUE_300),
+                                        col={"xs": 6, "sm": 3},
+                                    ),
+                                    ft.Container(
+                                        content=ft.Column([
+                                            ft.Text(f"Q2: {self.calculated_flows.get('Q2', 0):.2f}", size=13, weight="bold", color=ft.Colors.GREEN_600, text_align="center"),
+                                        ], horizontal_alignment="center"),
+                                        bgcolor=ft.Colors.GREEN_50,
+                                        padding=10,
+                                        border_radius=8,
+                                        border=ft.border.all(1, ft.Colors.GREEN_300),
+                                        col={"xs": 6, "sm": 3},
+                                    ),
+                                    ft.Container(
+                                        content=ft.Column([
+                                            ft.Text(f"Q3: {self.calculated_flows.get('Q3', 0):.2f}", size=13, weight="bold", color=ft.Colors.ORANGE_600, text_align="center"),
+                                        ], horizontal_alignment="center"),
+                                        bgcolor=ft.Colors.ORANGE_50,
+                                        padding=10,
+                                        border_radius=8,
+                                        border=ft.border.all(1, ft.Colors.ORANGE_300),
+                                        col={"xs": 6, "sm": 3},
+                                    ),
+                                    ft.Container(
+                                        content=ft.Column([
+                                            ft.Text(f"Q4: {self.calculated_flows.get('Q4', 0):.2f}", size=13, weight="bold", color=ft.Colors.PURPLE_600, text_align="center"),
+                                        ], horizontal_alignment="center"),
+                                        bgcolor=ft.Colors.PURPLE_50,
+                                        padding=10,
+                                        border_radius=8,
+                                        border=ft.border.all(1, ft.Colors.PURPLE_300),
+                                        col={"xs": 6, "sm": 3},
+                                    ),
+                                ], spacing=8),
+                            ], spacing=10),
+                            col={"xs": 12, "md": 6},  # 50% del ancho
+                            padding=ft.padding.only(right=10),
                         ),
+                        
+                        # 🔥 COLUMNA 2: VOLÚMENES CONFIGURADOS
                         ft.Container(
                             content=ft.Column([
-                                ft.Text(f"Q2: {self.calculated_flows.get('Q2', 0):.2f} L/h", size=12, weight="bold", color=ft.Colors.GREEN_600),
-                            ], horizontal_alignment="center"),
-                            bgcolor=ft.Colors.GREEN_50,
-                            padding=8,
-                            border_radius=8,
-                            col={"xs": 6, "sm": 3},
+                                ft.Text("📦 Volúmenes Configurados (L)", size=14, weight="bold", color=ft.Colors.TEAL_700, text_align="center"),
+                                ft.ResponsiveRow([
+                                    ft.Container(
+                                        content=ft.Column([
+                                            ft.Text(
+                                                f"Q1: {configured_volumes.get('Q1', 0)}" if configured_volumes.get('Q1', 0) > 0 else "No configurado",
+                                                size=13, 
+                                                weight="bold", 
+                                                color=ft.Colors.BLUE_800 if configured_volumes.get('Q1', 0) > 0 else ft.Colors.GREY_600,
+                                                text_align="center"
+                                            ),
+                                        ], horizontal_alignment="center"),
+                                        bgcolor=ft.Colors.BLUE_50 if configured_volumes.get('Q1', 0) > 0 else ft.Colors.GREY_100,
+                                        padding=10,
+                                        border_radius=8,
+                                        border=ft.border.all(1, ft.Colors.BLUE_300 if configured_volumes.get('Q1', 0) > 0 else ft.Colors.GREY_300),
+                                        col={"xs": 6, "sm": 3},
+                                    ),
+                                    ft.Container(
+                                        content=ft.Column([
+                                            ft.Text(
+                                                f"Q2: {configured_volumes.get('Q2', 0)}" if configured_volumes.get('Q2', 0) > 0 else "No configurado",
+                                                size=13, 
+                                                weight="bold", 
+                                                color=ft.Colors.GREEN_800 if configured_volumes.get('Q2', 0) > 0 else ft.Colors.GREY_600,
+                                                text_align="center"
+                                            ),
+                                        ], horizontal_alignment="center"),
+                                        bgcolor=ft.Colors.GREEN_50 if configured_volumes.get('Q2', 0) > 0 else ft.Colors.GREY_100,
+                                        padding=10,
+                                        border_radius=8,
+                                        border=ft.border.all(1, ft.Colors.GREEN_300 if configured_volumes.get('Q2', 0) > 0 else ft.Colors.GREY_300),
+                                        col={"xs": 6, "sm": 3},
+                                    ),
+                                    ft.Container(
+                                        content=ft.Column([
+                                            ft.Text(
+                                                f"Q3: {configured_volumes.get('Q3', 0)}" if configured_volumes.get('Q3', 0) > 0 else "No configurado",
+                                                size=13, 
+                                                weight="bold", 
+                                                color=ft.Colors.ORANGE_800 if configured_volumes.get('Q3', 0) > 0 else ft.Colors.GREY_600,
+                                                text_align="center"
+                                            ),
+                                        ], horizontal_alignment="center"),
+                                        bgcolor=ft.Colors.ORANGE_50 if configured_volumes.get('Q3', 0) > 0 else ft.Colors.GREY_100,
+                                        padding=10,
+                                        border_radius=8,
+                                        border=ft.border.all(1, ft.Colors.ORANGE_300 if configured_volumes.get('Q3', 0) > 0 else ft.Colors.GREY_300),
+                                        col={"xs": 6, "sm": 3},
+                                    ),
+                                    ft.Container(
+                                        content=ft.Column([
+                                            ft.Text(
+                                                f"Q4: {configured_volumes.get('Q4', 0)}" if configured_volumes.get('Q4', 0) > 0 else "No configurado",
+                                                size=13, 
+                                                weight="bold", 
+                                                color=ft.Colors.PURPLE_800 if configured_volumes.get('Q4', 0) > 0 else ft.Colors.GREY_600,
+                                                text_align="center"
+                                            ),
+                                        ], horizontal_alignment="center"),
+                                        bgcolor=ft.Colors.PURPLE_50 if configured_volumes.get('Q4', 0) > 0 else ft.Colors.GREY_100,
+                                        padding=10,
+                                        border_radius=8,
+                                        border=ft.border.all(1, ft.Colors.PURPLE_300 if configured_volumes.get('Q4', 0) > 0 else ft.Colors.GREY_300),
+                                        col={"xs": 6, "sm": 3},
+                                    ),
+                                ], spacing=8),
+                            ], spacing=10),
+                            col={"xs": 12, "md": 6},  # 50% del ancho
+                            padding=ft.padding.only(left=10),
                         ),
-                        ft.Container(
-                            content=ft.Column([
-                                ft.Text(f"Q3: {self.calculated_flows.get('Q3', 0):.2f} L/h", size=12, weight="bold", color=ft.Colors.ORANGE_600),
-                            ], horizontal_alignment="center"),
-                            bgcolor=ft.Colors.ORANGE_50,
-                            padding=8,
-                            border_radius=8,
-                            col={"xs": 6, "sm": 3},
-                        ),
-                        ft.Container(
-                            content=ft.Column([
-                                ft.Text(f"Q4: {self.calculated_flows.get('Q4', 0):.2f} L/h", size=12, weight="bold", color=ft.Colors.PURPLE_600),
-                            ], horizontal_alignment="center"),
-                            bgcolor=ft.Colors.PURPLE_50,
-                            padding=8,
-                            border_radius=8,
-                            col={"xs": 6, "sm": 3},
-                        ),
-                    ], spacing=10),
-                ], spacing=10),
-                padding=15,
+                    ], spacing=0),
+                ], spacing=15),
+                padding=20,
                 border_radius=12,
                 border=ft.border.all(2, ft.Colors.BLUE_300),
                 bgcolor=ft.Colors.BLUE_50,
-                col=12,  # Ocupa toda la fila
+                col=12,  # 🔥 OCUPA TODA LA FILA
             )
         ])
 
@@ -365,7 +473,7 @@ class TestExecutionView:
         return ft.ResponsiveRow([
             ft.Container(
                 content=ft.ElevatedButton(
-                    "📋 Ver Historial",
+                    "Ver Historial",
                     on_click=lambda e: self.on_view_history(),
                     height=40,
                     style=ft.ButtonStyle(
@@ -378,7 +486,7 @@ class TestExecutionView:
             ),
             ft.Container(
                 content=ft.ElevatedButton(
-                    "➕ Agregar Medidor",
+                    "Agregar Medidor",
                     on_click=lambda e: self.on_add_meter(),
                     height=40,
                     style=ft.ButtonStyle(
@@ -428,6 +536,13 @@ class TestExecutionView:
                         col=12,  # Ocupa toda la fila
                     )
                 ]),
+                ft.ResponsiveRow([
+                    ft.Container(
+                        content=self.create_calculated_flows_display(),
+                        margin=ft.margin.only(bottom=15),
+                        col=12,  # Ocupa toda la fila
+                    )
+                ]),
                 
                 # 🔥 FILA 3: GRID PRINCIPAL RESPONSIVO
                 ft.ResponsiveRow([
@@ -441,8 +556,6 @@ class TestExecutionView:
                     # 🔥 COLUMNA 2: ÁREA PRINCIPAL
                     ft.Container(
                         content=ft.Column([
-                            # 🔥 SUB-FILA 1: CAUDALES CALCULADOS
-                            self.create_calculated_flows_display(),
                             
                             # 🔥 SUB-FILA 3: TABLA DE PRUEBAS
                             ft.Container(

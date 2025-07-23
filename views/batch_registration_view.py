@@ -57,7 +57,7 @@ def get_batch_registration_view(page, on_continue):
 
     # 🔥 RADIOBUTTON PARA SELECCIÓN DE MODO
     operation_mode = ft.RadioGroup(
-        content=ft.Column([
+        content=ft.Row([
             ft.Radio(value="manual", label="Modo Manual"),
             ft.Radio(value="automatic", label="Modo Automático"),
         ]),
