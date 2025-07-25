@@ -81,6 +81,16 @@ class InstantValuesModule:
             height=50,
             text_style=ft.TextStyle(size=12, weight="bold", color=ft.Colors.PURPLE_700)
         )
+
+        self.current_values = {
+            "flow_q1": 0.0,
+            "flow_q2": 0.0,
+            "flow_q3": 0.0,
+            "vol_q1": 0.0,
+            "vol_q2": 0.0,
+            "vol_q3": 0.0,
+            "vol_q4": 0.0,
+        }
         
         # 🔥 INICIALIZAR CONTROLADOR MODBUS
         self.setup_modbus_controller()
@@ -130,16 +140,33 @@ class InstantValuesModule:
                 self.inst_vol_q3.value = f"{values[5]:.2f}"
                 self.inst_vol_q4.value = f"{values[6]:.2f}"
                 
-                # 🔥 NUEVO: ENVIAR VALORES A LA TABLA SI HAY CALLBACK
+                # 🔥 ACTUALIZAR VALORES ACTUALES PARA ACCESO DIRECTO
+                self.current_values = {
+                    "flow_q1": values[0],
+                    "flow_q2": values[1],
+                    "flow_q3": values[2],
+                    "vol_q1": values[3],
+                    "vol_q2": values[4],
+                    "vol_q3": values[5],
+                    "vol_q4": values[6],
+                }
+                
+                # 🔥 NUEVA PARTE: ENVIAR VALORES A LA TABLA EN TIEMPO REAL
                 if self.value_callback:
-                    instant_values = {
-                        "Q1": values[3],  # vol_q1
-                        "Q2": values[4],  # vol_q2  
-                        "Q3": values[5],  # vol_q3
-                        "Q4": values[6]   # vol_q4
-                    }
                     try:
-                        self.value_callback(instant_values)
+                        # 🔥 ENVIAR DIRECTAMENTE LOS VOLÚMENES (Q1=vol_q1, Q2=vol_q2, etc.)
+                        self.value_callback(values[3], values[4], values[5], values[6])  # Q1, Q2, Q3, Q4
+                        
+                        # 🔥 DEBUG OCASIONAL
+                        if hasattr(self, '_update_counter'):
+                            self._update_counter += 1
+                        else:
+                            self._update_counter = 1
+                            
+                        if self._update_counter % 50 == 0:  # Cada 50 actualizaciones
+                            print(f"[INSTANT_VALUES] 🔄 Enviando a tabla: Q1={values[3]:.2f}, Q2={values[4]:.2f}, Q3={values[5]:.2f}, Q4={values[6]:.2f}")
+                    except Exception as callback_error:
+                        print(f"[INSTANT_VALUES] ❌ Error en callback: {callback_error}")
                     except Exception as callback_error:
                         print(f"[INSTANT_VALUES] ❌ Error en callback: {callback_error}")
                 
@@ -148,10 +175,11 @@ class InstantValuesModule:
                     try:
                         for control in [self.inst_flow_q1, self.inst_flow_q2, self.inst_flow_q3,
                                        self.inst_vol_q1, self.inst_vol_q2, self.inst_vol_q3, self.inst_vol_q4]:
-                            if hasattr(control, 'update'):
+                            # 🔥 VERIFICAR QUE EL CONTROL ESTÉ EN LA PÁGINA ANTES DE ACTUALIZAR
+                            if hasattr(control, 'page') and control.page is not None:
                                 control.update()
-                    except Exception as update_error:
-                        print(f"[INSTANT_VALUES] ⚠️ Error actualizando control: {update_error}")
+                    except Exception as e:
+                        print(f"[INSTANT_VALUES] ❌ Error actualizando controles: {e}")
                 
                 # 🔥 USAR THREADING TIMER PARA EVITAR PROBLEMAS DE CONCURRENCIA
                 threading.Timer(0.1, safe_update).start()
@@ -167,8 +195,6 @@ class InstantValuesModule:
                 
             except Exception as e:
                 print(f"[INSTANT_VALUES] ❌ Error actualizando UI: {e}")
-                # 🔥 INFORMACIÓN ADICIONAL PARA DEBUG
-                print(f"[INSTANT_VALUES] 🔍 Data recibida: {data}")
                 
         elif kind == "log" and "log" in data:
             # 🔥 MANEJAR LOGS NORMALES (filtrar spam)
@@ -210,6 +236,121 @@ class InstantValuesModule:
                 "flow_q1": 0.0, "flow_q2": 0.0, "flow_q3": 0.0,
                 "vol_q1": 0.0, "vol_q2": 0.0, "vol_q3": 0.0, "vol_q4": 0.0
             }
+        
+    def get_current_instant_values(self):
+        """🔥 NUEVA FUNCIÓN: Obtiene valores en formato para tabla de pruebas"""
+        current = self.get_current_values()
+        return {
+            "Q1": current.get("vol_q1", 0.0),
+            "Q2": current.get("vol_q2", 0.0),
+            "Q3": current.get("vol_q3", 0.0),
+            "Q4": current.get("vol_q4", 0.0)
+        }
+
+    def get_pattern_value_for_test(self, test_type):
+        """🔥 MEJORADA: Obtiene el valor patrón específico para un tipo de prueba con debug detallado"""
+        try:
+            mapping = {
+                "Q1": "vol_q1",
+                "Q2": "vol_q2", 
+                "Q3": "vol_q3",
+                "Q4": "vol_q4"
+            }
+            
+            volume_key = mapping.get(test_type)
+            if not volume_key:
+                print(f"[INSTANT_VALUES] ⚠️ Tipo de prueba no válido: {test_type}")
+                return 0.0
+            
+            # 🔥 DEBUG: MOSTRAR ESTADO COMPLETO
+            print(f"[INSTANT_VALUES] 🔍 === DEBUG PARA {test_type} ===")
+            print(f"[INSTANT_VALUES] 🔍 Volume key: {volume_key}")
+            print(f"[INSTANT_VALUES] 🔍 current_values completo: {self.current_values}")
+            
+            # 🔥 PRIORIDAD 1: current_values (más actualizado)
+            pattern_value = self.current_values.get(volume_key, 0.0)
+            print(f"[INSTANT_VALUES] 📊 Valor desde current_values: {pattern_value:.2f}")
+            
+            # 🔥 PRIORIDAD 2: TextField como respaldo
+            if pattern_value <= 0.0:
+                text_field_mapping = {
+                    "vol_q1": self.inst_vol_q1,
+                    "vol_q2": self.inst_vol_q2,
+                    "vol_q3": self.inst_vol_q3,
+                    "vol_q4": self.inst_vol_q4
+                }
+                
+                text_field = text_field_mapping.get(volume_key)
+                if text_field:
+                    try:
+                        textfield_value = float(text_field.value)
+                        print(f"[INSTANT_VALUES] 📊 Valor desde TextField: {textfield_value:.2f}")
+                        pattern_value = textfield_value
+                    except (ValueError, TypeError) as e:
+                        print(f"[INSTANT_VALUES] ❌ Error convirtiendo TextField: {e}")
+                        pattern_value = 0.0
+            
+            # 🔥 PRIORIDAD 3: Último recurso - intentar get_current_values()
+            if pattern_value <= 0.0:
+                try:
+                    current_from_method = self.get_current_values()
+                    method_value = current_from_method.get(volume_key, 0.0)
+                    print(f"[INSTANT_VALUES] 📊 Valor desde get_current_values(): {method_value:.2f}")
+                    pattern_value = method_value
+                except Exception as e:
+                    print(f"[INSTANT_VALUES] ❌ Error en get_current_values(): {e}")
+            
+            print(f"[INSTANT_VALUES] 📊 === RESULTADO FINAL PARA {test_type}: {pattern_value:.2f} ===")
+            return pattern_value
+            
+        except Exception as e:
+            print(f"[INSTANT_VALUES] ❌ Error obteniendo valor patrón para {test_type}: {e}")
+            import traceback
+            traceback.print_exc()
+            return 0.0
+
+    def force_update_current_values(self):
+        """🔥 NUEVA FUNCIÓN: Fuerza actualización de current_values desde TextFields"""
+        try:
+            self.current_values = {
+                "flow_q1": float(self.inst_flow_q1.value),
+                "flow_q2": float(self.inst_flow_q2.value),
+                "flow_q3": float(self.inst_flow_q3.value),
+                "vol_q1": float(self.inst_vol_q1.value),
+                "vol_q2": float(self.inst_vol_q2.value),
+                "vol_q3": float(self.inst_vol_q3.value),
+                "vol_q4": float(self.inst_vol_q4.value),
+            }
+            print(f"[INSTANT_VALUES] 🔄 current_values actualizados forzadamente: {self.current_values}")
+            return self.current_values
+        except Exception as e:
+            print(f"[INSTANT_VALUES] ❌ Error forzando actualización: {e}")
+            return self.current_values
+
+    def debug_all_values(self):
+        """🔥 NUEVA FUNCIÓN: Debug completo de todos los valores"""
+        print(f"[INSTANT_VALUES] 🔍 === DEBUG COMPLETO ===")
+        print(f"[INSTANT_VALUES] 🔍 current_values: {self.current_values}")
+        
+        textfield_values = {}
+        try:
+            textfield_values = {
+                "vol_q1": self.inst_vol_q1.value,
+                "vol_q2": self.inst_vol_q2.value,
+                "vol_q3": self.inst_vol_q3.value,
+                "vol_q4": self.inst_vol_q4.value,
+            }
+            print(f"[INSTANT_VALUES] 🔍 TextField values: {textfield_values}")
+        except Exception as e:
+            print(f"[INSTANT_VALUES] ❌ Error leyendo TextFields: {e}")
+        
+        try:
+            method_values = self.get_current_values()
+            print(f"[INSTANT_VALUES] 🔍 get_current_values(): {method_values}")
+        except Exception as e:
+            print(f"[INSTANT_VALUES] ❌ Error en get_current_values(): {e}")
+        
+        print(f"[INSTANT_VALUES] 🔍 === FIN DEBUG ===")
     
     def stop_monitoring(self):
         """Detiene el monitoreo"""

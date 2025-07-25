@@ -25,6 +25,17 @@ class TestTableModule:
         
         # 🔥 CALLBACK PARA ENVIAR COMANDOS MODBUS
         self.send_modbus_command = None
+
+        # 🔥 REFERENCIA AL MÓDULO DE VALORES INSTANTÁNEOS
+        self.instant_values_module = None
+        
+        # 🔥 MAPEO DE TIPOS DE PRUEBA A VALORES INSTANTÁNEOS
+        self.test_to_instant_mapping = {
+            "Q1": "vol_q1",  # Q1 usa volumen Q1
+            "Q2": "vol_q2",  # Q2 usa volumen Q2  
+            "Q3": "vol_q3",  # Q3 usa volumen Q3
+            "Q4": "vol_q4"   # Q4 usa volumen Q4
+        }
         
         # 🔥 MAPEO DE MENSAJES DE CALIBRACIÓN A TIPOS DE PRUEBA
         self.calibration_messages = {
@@ -34,31 +45,18 @@ class TestTableModule:
             "✅ Fin de calibración Q4": "Q4"
         }
         
-        # 🔥 NUEVO: MAPEO DE MENSAJES DE FIN DE PRUEBA PARA ACTUALIZAR VALOR PATRÓN
-        self.test_completion_messages = {
-            "✅ Fin de prueba Q1": "Q1",
-            "✅ Fin de prueba Q2": "Q2", 
-            "✅ Fin de prueba Q3": "Q3",
-            "✅ Fin de prueba Q4": "Q4"
-        }
-        
         print(f"[TEST_TABLE] 🚀 Inicializando tabla con {len(self.rows)} fila(s)")
 
         # 🔥 VALORES INSTANTÁNEOS ACTUALES (SE ACTUALIZAN EN TIEMPO REAL)
         self.instant_values = {
-            "Q1": 1000.0,
-            "Q2": 2000.0,
-            "Q3": 3000.0,
-            "Q4": 4000.0,
+            "Q1": 0.1,  # 🔥 CAMBIADO DE 1000.0 A 0.1
+            "Q2": 0.1,  # 🔥 CAMBIADO DE 2000.0 A 0.1
+            "Q3": 0.1,  # 🔥 CAMBIADO DE 3000.0 A 0.1
+            "Q4": 0.1,  # 🔥 CAMBIADO DE 4000.0 A 0.1
         }
 
-        # 🔥 VALORES PATRÓN GUARDADOS (SE GUARDAN AL COMPLETAR PRUEBA)
-        self.saved_pattern_values = {
-            "Q1": [],  # Lista de valores guardados para Q1
-            "Q2": [],  # Lista de valores guardados para Q2
-            "Q3": [],  # Lista de valores guardados para Q3
-            "Q4": [],  # Lista de valores guardados para Q4
-        }
+        # 🔥 ELIMINAR: saved_pattern_values (YA NO SE NECESITA)
+        # 🔥 Los valores patrón ahora se obtienen directamente de instant_values en tiempo real
 
         # 🔥 ESTADO DE PRUEBAS ACTIVAS (PARA RESETEAR CUANDO INICIA NUEVA PRUEBA)
         self.active_test_type = None
@@ -69,6 +67,15 @@ class TestTableModule:
 
         # 🔥 TIMER MODULE
         self.timer_module = create_timer_module(self._on_timer_finished)
+
+        # 🔥 NUEVA VARIABLE: REFERENCIAS A LAS CELDAS DE VOLUMEN PATRÓN
+        self.pattern_volume_cells = {}  # {row_idx: Text_widget}
+        
+        # 🔥 NUEVA VARIABLE: REFERENCIAS A LAS CELDAS DE ERROR
+        self.error_cells = {}  # {row_idx: Text_widget}
+        
+        # 🔥 NUEVA VARIABLE: REFERENCIAS A LAS CELDAS DE ESTADO
+        self.status_cells = {}
 
         self.data_table = ft.DataTable(
             columns=[
@@ -145,11 +152,18 @@ class TestTableModule:
             service.send_command(comand_off)
             print(f"[MODBUS] Bit M{bit} activado/desactivado")
             
-            # 🔥 LLAMADA SIMPLIFICADA Y DIRECTA
-            threading.Timer(0.3).start()
+            # 🔥 CORRECCIÓN: Timer necesita una función
+            def dummy_callback():
+                pass
+            threading.Timer(0.3, dummy_callback).start()
             
         except Exception as ex:
             print(f"[MODBUS] ❌ Error en send_bool_m para M{bit}: {ex}")
+
+    def set_instant_values_module(self, instant_values_module):
+        """🔥 NUEVA FUNCIÓN: Establece referencia al módulo de valores instantáneos"""
+        self.instant_values_module = instant_values_module
+        print("[TEST_TABLE] 🔗 Referencia al módulo de valores instantáneos establecida")
 
     def set_modbus_callback(self, callback):
         """🔥 NUEVA FUNCIÓN: Establece el callback para enviar comandos Modbus"""
@@ -205,11 +219,12 @@ class TestTableModule:
             return 5  # Default 5 minutos
 
     def process_calibration_message(self, message):
-        """🔥 MEJORADA: Procesa mensajes de calibración del PLC"""
+        """🔥 MEJORADA: Procesa mensajes de calibración Y establecimiento automático"""
         if not message:
             return
             
         message_str = str(message).strip()
+        print(f"[TEST_TABLE] 📨 Procesando mensaje: '{message_str}'")
         
         # 🔥 BUSCAR SI EL MENSAJE CORRESPONDE A FIN DE CALIBRACIÓN
         for calib_msg, test_type in self.calibration_messages.items():
@@ -218,14 +233,7 @@ class TestTableModule:
                 self.set_test_type_from_calibration(test_type)
                 return
         
-        # 🔥 BUSCAR SI EL MENSAJE CORRESPONDE A FIN DE PRUEBA
-        for completion_msg, test_type in self.test_completion_messages.items():
-            if completion_msg in message_str:
-                print(f"[TEST_TABLE] 🏁 Fin de prueba detectado: {completion_msg} -> {test_type}")
-                self.update_pattern_value_from_instant(test_type)
-                return
-        
-        # 🔥 TAMBIÉN VERIFICAR POR NÚMERO DE MENSAJE
+        # 🔥 VERIFICACIÓN POR CÓDIGOS NUMÉRICOS SOLO PARA CALIBRACIÓN
         calibration_codes = {
             4: "Q1",   # Fin de calibración Q1
             9: "Q2",   # Fin de calibración Q2
@@ -233,15 +241,7 @@ class TestTableModule:
             17: "Q4"   # Fin de calibración Q4
         }
         
-        # 🔥 CÓDIGOS DE FIN DE PRUEBA
-        completion_codes = {
-            6: "Q1",   # Fin de prueba Q1
-            11: "Q2",  # Fin de prueba Q2
-            15: "Q3",  # Fin de prueba Q3
-            19: "Q4"   # Fin de prueba Q4
-        }
-        
-        # Si el mensaje es un número, verificar si es código de calibración o fin de prueba
+        # Si el mensaje es un número, verificar si es código de calibración
         try:
             message_code = int(message_str)
             
@@ -250,76 +250,72 @@ class TestTableModule:
                 print(f"[TEST_TABLE] 🎯 Código de calibración detectado: {message_code} -> {test_type}")
                 self.set_test_type_from_calibration(test_type)
                 
-            elif message_code in completion_codes:
-                test_type = completion_codes[message_code]
-                print(f"[TEST_TABLE] 🏁 Código de fin de prueba detectado: {message_code} -> {test_type}")
-                self.update_pattern_value_from_instant(test_type)
-                
         except ValueError:
-            # No es un número, ignorar
+            # No es un número, continuar
             pass
-
-    def update_pattern_value_from_instant(self, test_type):
-        """🔥 NUEVA FUNCIÓN: Actualiza el valor patrón usando valores instantáneos"""
-        try:
-            # 🔥 OBTENER VALOR INSTANTÁNEO ACTUAL
-            instant_value = self.instant_values.get(test_type, 0.0)
+        
+        # 🔥 DETECTAR INICIO Y FIN DE PRUEBA SOLO PARA LOGS
+        if "🧪 Inicio de prueba" in message_str:
+            print(f"[TEST_TABLE] 🚀 Inicio de prueba detectado en mensaje")
             
-            if instant_value < 1.0:
-                print(f"[TEST_TABLE] ⚠️ Valor instantáneo muy pequeño para {test_type}: {instant_value:.2f}")
-                return
-            
-            # 🔥 GUARDAR EL VALOR PATRÓN
-            if test_type in self.saved_pattern_values:
-                self.saved_pattern_values[test_type].append(instant_value)
-                print(f"[TEST_TABLE] 💾 Valor patrón guardado para {test_type}: {instant_value:.2f}")
-                print(f"[TEST_TABLE] 📚 Histórico {test_type}: {self.saved_pattern_values[test_type]}")
+            # 🔥 SI NO HAY TIPO DE PRUEBA ESTABLECIDO, INTENTAR EXTRAERLO DEL MENSAJE
+            if not self.current_test_type:
+                if "Q1" in message_str:
+                    auto_type = "Q1"
+                elif "Q2" in message_str:
+                    auto_type = "Q2"
+                elif "Q3" in message_str:
+                    auto_type = "Q3"
+                elif "Q4" in message_str:
+                    auto_type = "Q4"
+                else:
+                    auto_type = None
                 
-                # 🔥 ACTUALIZAR INMEDIATAMENTE LA TABLA
-                self.update_table()
-                
-                # 🔥 FORZAR UPDATE DE LA PÁGINA
-                if hasattr(self.data_table, 'page') and self.data_table.page is not None:
-                    self.data_table.page.update()
+                if auto_type:
+                    print(f"[TEST_TABLE] 🎯 Auto-estableciendo tipo desde mensaje de inicio: {auto_type}")
+                    self.set_test_type_from_calibration(auto_type)
                     
-            # 🔥 MARCAR QUE YA NO HAY PRUEBA EN PROGRESO
-            if self.active_test_type == test_type:
-                self.test_in_progress = False
-                self.active_test_type = None
-                print(f"[TEST_TABLE] ✅ Prueba {test_type} marcada como completada")
-                
-        except Exception as e:
-            print(f"[TEST_TABLE] ❌ Error actualizando valor patrón desde instantáneo: {e}")
+        elif "⏳ Estado de espera" in message_str:
+            print(f"[TEST_TABLE] 🏁 Fin de prueba detectado en mensaje")
+
+    
+    def force_set_test_type_q4(self):
+        """🔥 FUNCIÓN DE EMERGENCIA: Fuerza Q4 como tipo de prueba"""
+        print(f"[TEST_TABLE] 🚨 FORZANDO tipo de prueba Q4")
+        self.set_test_type_from_calibration("Q4")        
 
     def set_test_type_from_calibration(self, test_type):
-        """🔥 MEJORADA: Establece el tipo de prueba desde calibración del PLC"""
+        """🔥 CORREGIDA: Establece el tipo de prueba desde calibración del PLC"""
+        print(f"[TEST_TABLE] 🎯 Estableciendo tipo de prueba por calibración: {test_type}")
+        
         self.current_test_type = test_type
         
         # 🔥 CREAR AL MENOS UNA FILA SI NO HAY NINGUNA
         if not self.rows:
             self.rows.append(["", "", "", "", "", "", "", ""])
+            print(f"[TEST_TABLE] 📝 Creada fila inicial")
         
         # 🔥 RELLENAR TODAS LAS FILAS CON EL TIPO DE PRUEBA SELECCIONADO
-        for row in self.rows:
+        for idx, row in enumerate(self.rows):
+            old_type = row[2]
             row[2] = test_type  # Columna de tipo de prueba
+            print(f"[TEST_TABLE] 🔄 Fila {idx}: '{old_type}' → '{test_type}'")
         
-        # 🔥 NUEVO: CALCULAR Y CONFIGURAR TIEMPO ESTIMADO EN EL TIMER
+        # 🔥 CALCULAR Y CONFIGURAR TIEMPO ESTIMADO EN EL TIMER
         estimated_time = self.calculate_estimated_time(test_type)
         self.timer_module.set_time(estimated_time)
         
+        # 🔥 FORZAR ACTUALIZACIÓN COMPLETA DE LA TABLA
+        print(f"[TEST_TABLE] 🔄 Forzando actualización completa de tabla...")
         self.update_table()
-        print(f"[TEST_TABLE] 🎯 Tipo de prueba establecido por calibración: {test_type}")
-        print(f"[TEST_TABLE] ⏱️ Tiempo estimado configurado: {estimated_time:.1f} minutos")
         
-        # 🔥 ACTUALIZAR INDICADOR VISUAL
-        if hasattr(self, 'test_type_indicator') and self.test_type_indicator:
-            try:
-                self.test_type_indicator.content.value = f"🎯 Tipo de prueba: {test_type} (Calibrado) | ⏱️ Tiempo: {estimated_time:.1f}min"
-                self.test_type_indicator.content.color = ft.Colors.GREEN_700
-                if hasattr(self.test_type_indicator, 'update'):
-                    self.test_type_indicator.update()
-            except Exception as e:
-                print(f"[TEST_TABLE] ⚠️ Error actualizando indicador: {e}")
+        print(f"[TEST_TABLE] ✅ Tipo de prueba establecido: {test_type}")
+        print(f"[TEST_TABLE] ⏱️ Tiempo estimado configurado: {estimated_time:.1f} minutos")
+
+    def debug_set_test_type(self, test_type):
+        """🔥 FUNCIÓN DEBUG: Fuerza el establecimiento de un tipo de prueba"""
+        print(f"[TEST_TABLE] 🔧 DEBUG: Forzando tipo de prueba a {test_type}")
+        self.set_test_type_from_calibration(test_type)
 
     def set_test_type_from_button(self, test_type):
         """🔥 FUNCIÓN EXISTENTE: Establece el tipo de prueba desde el botón presionado"""
@@ -356,45 +352,37 @@ class TestTableModule:
         return count if serial else ""
 
     def get_pattern_volume_for_row(self, row_idx):
-        """Obtiene el volumen patrón para una fila específica"""
+        """🔥 CORREGIDA: Obtiene el volumen patrón directamente de valores instantáneos"""
         try:
             if row_idx >= len(self.rows):
-                return 0.0
+                return 0.1
                 
             test_type = self.rows[row_idx][2]
             if not test_type or test_type == "Escoja una opción":
-                return 0.0
+                return 0.1
             
-            # 🔥 OBTENER EL SERIAL DE LA FILA ACTUAL
-            current_serial = self.rows[row_idx][1]
+            # 🔥 SIMPLIFICADO: OBTENER DIRECTAMENTE EL VALOR INSTANTÁNEO ACTUAL
+            instant_volume = self.instant_values.get(test_type, 0.1)
             
-            # 🔥 CONTAR CUÁNTAS PRUEBAS DEL MISMO TIPO Y MISMO SERIAL HAY ANTES DE ESTA FILA
-            test_count = 0
-            for i in range(row_idx + 1):  # Incluir la fila actual
-                if i < len(self.rows) and self.rows[i][2] == test_type and self.rows[i][1] == current_serial:
-                    test_count += 1
+            # 🔥 SI HAY MÓDULO DE VALORES INSTANTÁNEOS, USAR ESE VALOR
+            if self.instant_values_module:
+                try:
+                    module_value = self.instant_values_module.get_pattern_value_for_test(test_type)
+                    if module_value > 0.1:
+                        instant_volume = module_value
+                        print(f"[TEST_TABLE] 📊 Valor del módulo para {test_type}: {module_value:.2f}")
+                except Exception as e:
+                    print(f"[TEST_TABLE] ⚠️ Error obteniendo valor del módulo: {e}")
             
-            # 🔥 OBTENER EL VALOR PATRÓN GUARDADO CORRESPONDIENTE
-            saved_values = self.saved_pattern_values.get(test_type, [])
+            # 🔥 ASEGURAR VALOR MÍNIMO
+            instant_volume = max(instant_volume, 0.1)
             
-            print(f"[TEST_TABLE] 🔍 Fila {row_idx}: tipo={test_type}, serial={current_serial}, test_count={test_count}")
-            print(f"[TEST_TABLE] 📚 Valores guardados para {test_type}: {saved_values}")
-            
-            # 🔥 USAR EL ÚLTIMO VALOR GUARDADO SI EXISTE
-            if len(saved_values) > 0:
-                volume_index = min(test_count - 1, len(saved_values) - 1)
-                volume = saved_values[volume_index]
-                print(f"[TEST_TABLE] 📊 Usando volumen guardado [{volume_index}]: {volume}")
-                return volume
-            else:
-                # Si no hay valor guardado, usar el instantáneo actual
-                volume = self.instant_values.get(test_type, 0.0)
-                print(f"[TEST_TABLE] 📊 Usando volumen instantáneo: {volume}")
-                return volume
+            print(f"[TEST_TABLE] 📊 Volumen patrón para fila {row_idx} ({test_type}): {instant_volume:.2f}")
+            return instant_volume
                     
         except Exception as e:
             print(f"[TEST_TABLE] ❌ Error obteniendo volumen patrón: {e}")
-            return 0.0
+            return 0.1
 
     def calculate_error(self, start_str, end_str, pattern_volume, test_type):
         """Calcula el error porcentual y determina si pasa o no"""
@@ -469,11 +457,81 @@ class TestTableModule:
             alert.open = True
             self.data_table.page.update()
 
+    def on_text_change_with_pattern_update(self, e, row_idx, col_idx):
+        """🔥 NUEVA FUNCIÓN: Maneja cambios de texto Y actualiza valores patrón"""
+        # 🔥 ACTUALIZAR EL VALOR EN EL ARRAY
+        if row_idx < len(self.rows):
+            self.rows[row_idx][col_idx] = e.control.value
+        
+        # 🔥 ACTUALIZAR SOLO LOS VALORES PATRÓN/ERROR DE ESTA FILA
+        self.update_single_row_pattern(row_idx)
+
+    def update_single_row_pattern(self, row_idx):
+        """🔥 NUEVA FUNCIÓN: Actualiza el valor patrón y error de UNA SOLA fila"""
+        try:
+            if row_idx >= len(self.rows):
+                return
+            
+            # 🔥 OBTENER NUEVO VALOR PATRÓN
+            pattern_volume = self.get_pattern_volume_for_row(row_idx)
+            
+            # 🔥 ACTUALIZAR EL VALOR EN EL ARRAY
+            self.rows[row_idx][5] = f"{pattern_volume:.2f}"
+            
+            # 🔥 ACTUALIZAR WIDGET DE VOLUMEN PATRÓN SI EXISTE
+            if row_idx in self.pattern_volume_cells:
+                pattern_cell = self.pattern_volume_cells[row_idx]
+                if hasattr(pattern_cell, 'value'):
+                    pattern_cell.value = f"{pattern_volume:.2f}"
+                    try:
+                        pattern_cell.update()
+                    except:
+                        pass
+            
+            # 🔥 RECALCULAR ERROR
+            row = self.rows[row_idx]
+            error, status_text, status_color = self.calculate_error(row[3], row[4], pattern_volume, row[2])
+            
+            # 🔥 ACTUALIZAR ERROR EN EL ARRAY
+            self.rows[row_idx][6] = str(error)
+            self.rows[row_idx][7] = status_text
+            
+            # 🔥 ACTUALIZAR WIDGET DE ERROR SI EXISTE
+            if row_idx in self.error_cells:
+                error_cell = self.error_cells[row_idx]
+                if hasattr(error_cell, 'value'):
+                    error_cell.value = str(error)
+                    try:
+                        error_cell.update()
+                    except:
+                        pass
+            
+            # 🔥 ACTUALIZAR WIDGET DE ESTADO SI EXISTE
+            if row_idx in self.status_cells:
+                status_container = self.status_cells[row_idx]
+                if hasattr(status_container, 'content') and hasattr(status_container.content, 'value'):
+                    status_container.content.value = status_text
+                    status_container.content.color = "white"
+                    status_container.bgcolor = status_color
+                    try:
+                        status_container.update()
+                    except:
+                        pass
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error actualizando fila {row_idx}: {e}")
+
+
     def update_table(self):
-        """Actualiza la tabla con los datos actuales"""
+        """🔥 MEJORADA: Actualiza la tabla y guarda referencias a las celdas importantes"""
         try:
             print(f"[TEST_TABLE] 🔄 Actualizando tabla con {len(self.rows)} filas")
             data_rows = []
+            
+            # 🔥 LIMPIAR REFERENCIAS ANTERIORES
+            self.pattern_volume_cells.clear()
+            self.error_cells.clear()
+            self.status_cells.clear()
             
             for idx, row in enumerate(self.rows):
                 if idx >= len(self.rows):
@@ -488,19 +546,66 @@ class TestTableModule:
                 error, status_text, status_color = self.calculate_error(row[3], row[4], pattern_volume, row[2])
                 self.rows[idx][6] = str(error)
                 self.rows[idx][7] = status_text
+
+                # 🔥 CREAR WIDGETS CON REFERENCIAS GUARDADAS
+                
+                # 🔥 WIDGET DE VOLUMEN PATRÓN CON REFERENCIA
+                pattern_text = ft.Text(
+                    f"{pattern_volume:.2f}",
+                    weight="bold",
+                    color=ft.Colors.BLUE_700,
+                    text_align=ft.TextAlign.CENTER,
+                )
+                self.pattern_volume_cells[idx] = pattern_text  # 🔥 GUARDAR REFERENCIA
+                
+                pattern_container = ft.Container(
+                    content=pattern_text,
+                    width=75,
+                    height=30,
+                    padding=ft.padding.all(6),
+                    bgcolor=ft.Colors.BLUE_50,
+                    border_radius=8,
+                    alignment=ft.alignment.center,
+                    margin=ft.margin.symmetric(vertical=5),
+                )
+                
+                # 🔥 WIDGET DE ERROR CON REFERENCIA
+                error_text = ft.Text(str(error), weight="bold", text_align=ft.TextAlign.CENTER)
+                self.error_cells[idx] = error_text  # 🔥 GUARDAR REFERENCIA
+                
+                # 🔥 WIDGET DE ESTADO CON REFERENCIA
+                status_text_widget = ft.Text(
+                    status_text, 
+                    color="white", 
+                    weight="bold", 
+                    size=12,
+                    text_align=ft.TextAlign.CENTER
+                )
+                
+                status_container = ft.Container(
+                    content=status_text_widget,
+                    bgcolor=status_color,
+                    padding=ft.padding.symmetric(horizontal=8, vertical=6),
+                    border_radius=8,
+                    alignment=ft.alignment.center,
+                    width=80,
+                    height=28,
+                    margin=ft.margin.symmetric(vertical=8),
+                )
+                self.status_cells[idx] = status_container  # 🔥 GUARDAR REFERENCIA
     
                 data_rows.append(ft.DataRow(cells=[
                     # 🔥 CELDA DE NÚMERO - CENTRADA
                     ft.DataCell(ft.Container(
                         ft.Text(str(test_num)),
-                        alignment=ft.alignment.center,  # 🔥 CENTRADO
+                        alignment=ft.alignment.center,
                     )),
                     # 🔥 CELDA DE SERIAL - CENTRADA
                     ft.DataCell(ft.Container(
                         ft.TextField(
                             value=row[1],
                             on_change=lambda e, row_idx=idx: self.on_text_change(e, row_idx, 1),
-                            on_submit=lambda e, row_idx=idx: self.recalculate_errors(None),  # 🔥 RECALCULAR CON ENTER
+                            on_submit=lambda e, row_idx=idx: self.recalculate_errors(None),
                             keyboard_type=ft.KeyboardType.NUMBER,
                             input_filter=ft.InputFilter(allow=True, regex_string=r"^\d*$"),
                             dense=True,
@@ -508,11 +613,11 @@ class TestTableModule:
                             border_radius=12,
                             filled=True,
                             bgcolor=INPUT_BG,
-                            text_align=ft.TextAlign.CENTER,  # 🔥 TEXTO CENTRADO
+                            text_align=ft.TextAlign.CENTER,
                         ),
                         width=120,
                         padding=0,
-                        alignment=ft.alignment.center,  # 🔥 CONTAINER CENTRADO
+                        alignment=ft.alignment.center,
                     )),
                     # 🔥 CELDA DE TIPO DE PRUEBA - AHORA SOLO TEXTO (NO DROPDOWN)
                     ft.DataCell(ft.Container(
@@ -539,8 +644,8 @@ class TestTableModule:
                     ft.DataCell(ft.Container(
                         ft.TextField(
                             value=row[3],
-                            on_change=lambda e, row_idx=idx: self.on_text_change(e, row_idx, 3),
-                            on_submit=lambda e, row_idx=idx: self.recalculate_errors(None),  # 🔥 RECALCULAR CON ENTER
+                            on_change=lambda e, row_idx=idx: self.on_text_change_with_pattern_update(e, row_idx, 3),  # 🔥 NUEVA FUNCIÓN
+                            on_submit=lambda e, row_idx=idx: self.recalculate_errors(None),
                             keyboard_type=ft.KeyboardType.NUMBER,
                             input_filter=ft.InputFilter(allow=True, regex_string=r"^\d*\.?\d*$"),
                             dense=True,
@@ -548,18 +653,18 @@ class TestTableModule:
                             border_radius=12,
                             filled=True,
                             bgcolor=INPUT_BG,
-                            text_align=ft.TextAlign.CENTER,  # 🔥 TEXTO CENTRADO
+                            text_align=ft.TextAlign.CENTER,
                         ),
                         width=80,
                         padding=0,
-                        alignment=ft.alignment.center,  # 🔥 CONTAINER CENTRADO
+                        alignment=ft.alignment.center,
                     )),
                     # 🔥 CELDA DE LECTURA FINAL - CENTRADA
                     ft.DataCell(ft.Container(
                         ft.TextField(
                             value=row[4],
-                            on_change=lambda e, row_idx=idx: self.on_text_change(e, row_idx, 4),
-                            on_submit=lambda e, row_idx=idx: self.recalculate_errors(None),  # 🔥 RECALCULAR CON ENTER
+                            on_change=lambda e, row_idx=idx: self.on_text_change_with_pattern_update(e, row_idx, 4),  # 🔥 NUEVA FUNCIÓN
+                            on_submit=lambda e, row_idx=idx: self.recalculate_errors(None),
                             keyboard_type=ft.KeyboardType.NUMBER,
                             input_filter=ft.InputFilter(allow=True, regex_string=r"^\d*\.?\d*$"),
                             dense=True,
@@ -567,58 +672,29 @@ class TestTableModule:
                             border_radius=12,
                             filled=True,
                             bgcolor=INPUT_BG,
-                            text_align=ft.TextAlign.CENTER,  # 🔥 TEXTO CENTRADO
+                            text_align=ft.TextAlign.CENTER,
                         ),
                         width=80,
                         padding=0,
-                        alignment=ft.alignment.center,  # 🔥 CONTAINER CENTRADO
+                        alignment=ft.alignment.center,
                     )),
-                    # 🔥 COLUMNA DE VOLUMEN PATRÓN CON MARGEN - CENTRADA
+                    # 🔥 COLUMNA DE VOLUMEN PATRÓN CON REFERENCIA GUARDADA
                     ft.DataCell(ft.Container(
-                        ft.Container(  # 🔥 CONTAINER INTERNO CON MARGEN
-                            ft.Text(
-                                f"{pattern_volume:.2f}",
-                                weight="bold",
-                                color=ft.Colors.BLUE_700,
-                                text_align=ft.TextAlign.CENTER,  # 🔥 TEXTO CENTRADO
-                            ),
-                            width=75,  # 🔥 ANCHO FIJO MÁS PEQUEÑO
-                            height=30,  # 🔥 ALTURA FIJA
-                            padding=ft.padding.all(6),
-                            bgcolor=ft.Colors.BLUE_50,
-                            border_radius=8,
-                            alignment=ft.alignment.center,  # 🔥 CONTENIDO CENTRADO
-                            margin=ft.margin.symmetric(vertical=5),  # 🔥 MARGEN VERTICAL
-                        ),
-                        width=90,  # Container externo
-                        alignment=ft.alignment.center,  # 🔥 CONTAINER CENTRADO
+                        pattern_container,
+                        width=90,
+                        alignment=ft.alignment.center,
                     )),
-                    # 🔥 CELDA DE ERROR - CENTRADA
+                    # 🔥 CELDA DE ERROR CON REFERENCIA GUARDADA
                     ft.DataCell(ft.Container(
-                        ft.Text(str(error), weight="bold", text_align=ft.TextAlign.CENTER),
-                        alignment=ft.alignment.center,  # 🔥 CONTAINER CENTRADO
-                        margin=ft.margin.symmetric(vertical=5),  # 🔥 MARGEN PARA ERROR
+                        error_text,
+                        alignment=ft.alignment.center,
+                        margin=ft.margin.symmetric(vertical=5),
                     )),
-                    # 🔥 COLUMNA DE ESTADO CON MARGEN Y TAMAÑO CONTROLADO - CENTRADA
+                    # 🔥 COLUMNA DE ESTADO CON REFERENCIA GUARDADA
                     ft.DataCell(ft.Container(
-                        ft.Container(  # 🔥 CONTAINER INTERNO CON MARGEN
-                            ft.Text(
-                                status_text, 
-                                color="white", 
-                                weight="bold", 
-                                size=12,
-                                text_align=ft.TextAlign.CENTER  # 🔥 TEXTO CENTRADO
-                            ),
-                            bgcolor=status_color,
-                            padding=ft.padding.symmetric(horizontal=8, vertical=6),
-                            border_radius=8,
-                            alignment=ft.alignment.center,  # 🔥 CONTENIDO CENTRADO
-                            width=80,  # 🔥 ANCHO FIJO
-                            height=28,  # 🔥 ALTURA FIJA PEQUEÑA
-                            margin=ft.margin.symmetric(vertical=8),  # 🔥 MARGEN VERTICAL
-                        ),
-                        alignment=ft.alignment.center,  # 🔥 CONTAINER CENTRADO
-                        width=100,  # Container externo
+                        status_container,
+                        alignment=ft.alignment.center,
+                        width=100,
                     )),
                     # 🔥 CELDA DE BOTÓN - CENTRADA
                     ft.DataCell(ft.Container(
@@ -628,13 +704,14 @@ class TestTableModule:
                             icon_color=ft.Colors.RED_400,
                             on_click=lambda e, idx=idx: self.remove_row(idx),
                         ),
-                        alignment=ft.alignment.center,  # 🔥 BOTÓN CENTRADO
-                        margin=ft.margin.symmetric(vertical=3),  # 🔥 MARGEN PARA BOTÓN
+                        alignment=ft.alignment.center,
+                        margin=ft.margin.symmetric(vertical=3),
                     )),
                 ]))
             
             self.data_table.rows = data_rows
             print(f"[TEST_TABLE] 🔄 DataTable actualizado con {len(data_rows)} filas")
+            print(f"[TEST_TABLE] 🔗 Referencias guardadas: {len(self.pattern_volume_cells)} vol_patrón, {len(self.error_cells)} errores, {len(self.status_cells)} estados")
             
             if hasattr(self.data_table, 'page') and self.data_table.page is not None:
                 self.data_table.update()
@@ -986,78 +1063,151 @@ class TestTableModule:
             dialog.open = True
             self.data_table.page.update()
 
-    def notify_test_start(self, test_type):
-        """🔥 FUNCIÓN PARA NOTIFICAR INICIO DE NUEVA PRUEBA"""
-        print(f"[TEST_TABLE] 🚀 INICIO DE CONFIGURACIÓN: {test_type}")
-        
-        # 🔥 ESTABLECER EL TIPO DE PRUEBA EN LA TABLA
-        self.set_test_type_from_button(test_type)
-        
-        # Si es una nueva prueba del mismo tipo, es repetibilidad
-        if self.active_test_type == test_type:
-            print(f"[TEST_TABLE] 🔄 Prueba de repetibilidad detectada para {test_type}")
-        
-        self.active_test_type = test_type
-        self.test_in_progress = True
-        
-        print(f"[TEST_TABLE] 📊 Prueba {test_type} marcada como activa")
-
-    def capture_pattern_volume(self, test_type, final_volume):
-        """🔥 FUNCIÓN PARA CAPTURAR Y GUARDAR VOLUMEN AL COMPLETAR PRUEBA"""
-        print(f"[TEST_TABLE] 🏁 PRUEBA COMPLETADA: {test_type}")
-        print(f"[TEST_TABLE] 💾 Guardando volumen patrón: {final_volume:.2f}")
-        
-        # 🔥 VALIDAR QUE EL VOLUMEN SEA VÁLIDO
-        if final_volume < 1.0:
-            print(f"[TEST_TABLE] ⚠️ Volumen muy pequeño ({final_volume:.2f}), no guardando")
-            return
-        
-        # 🔥 GUARDAR EL VOLUMEN PATRÓN FINAL
-        if test_type in self.saved_pattern_values:
-            self.saved_pattern_values[test_type].append(final_volume)
-            print(f"[TEST_TABLE] 📚 Histórico {test_type}: {self.saved_pattern_values[test_type]}")
-            
-            # 🔥 ACTUALIZAR INMEDIATAMENTE TODAS LAS FILAS
-            print(f"[TEST_TABLE] 🔄 Forzando actualización de tabla...")
-            self.update_table()
-            
-            # 🔥 FORZAR UPDATE DE LA PÁGINA
-            if hasattr(self.data_table, 'page') and self.data_table.page is not None:
-                print(f"[TEST_TABLE] 🔄 Forzando update de página...")
-                self.data_table.page.update()
-    
-        self.test_in_progress = False
-        self.active_test_type = None
 
     def update_instant_values(self, q1, q2, q3, q4):
-        """Actualiza los valores instantáneos"""
-        # 🔥 LOGS REDUCIDOS PARA EVITAR SPAM
-        if self.test_in_progress and self.active_test_type:
-            current_value = locals()[self.active_test_type.lower()]
-            print(f"[TEST_TABLE] 📊 Actualizando {self.active_test_type}: {current_value:.2f}")
+        """🔥 MEJORADA: Actualiza los valores instantáneos Y fuerza actualización de tabla"""
+        # 🔥 ASEGURAR QUE TODOS LOS VALORES SEAN AL MENOS 0.1
+        q1 = max(q1, 0.1)
+        q2 = max(q2, 0.1)
+        q3 = max(q3, 0.1)
+        q4 = max(q4, 0.1)
         
-        # 🔥 SOLO ACTUALIZAR EL VALOR DE LA PRUEBA ACTIVA SI HAY PRUEBA EN CURSO
-        if self.test_in_progress and self.active_test_type:
-            if self.active_test_type == "Q1":
-                self.instant_values["Q1"] = max(q1, 0.1)
-            elif self.active_test_type == "Q2":
-                self.instant_values["Q2"] = max(q2, 0.1)
-            elif self.active_test_type == "Q3":
-                self.instant_values["Q3"] = max(q3, 0.1)
-            elif self.active_test_type == "Q4":
-                self.instant_values["Q4"] = max(q4, 0.1)
-        else:
-            # Si no hay prueba activa, actualizar todos los valores normalmente
-            self.instant_values["Q1"] = max(q1, 0.1)
-            self.instant_values["Q2"] = max(q2, 0.1)
-            self.instant_values["Q3"] = max(q3, 0.1)
-            self.instant_values["Q4"] = max(q4, 0.1)
+        # 🔥 ACTUALIZAR TODOS LOS VALORES
+        old_values = self.instant_values.copy()
+        self.instant_values["Q1"] = q1
+        self.instant_values["Q2"] = q2
+        self.instant_values["Q3"] = q3
+        self.instant_values["Q4"] = q4
+        
+        # 🔥 DEBUG: MOSTRAR CAMBIOS SIGNIFICATIVOS
+        for test_type in ["Q1", "Q2", "Q3", "Q4"]:
+            old_val = old_values.get(test_type, 0.1)
+            new_val = self.instant_values[test_type]
+            if abs(new_val - old_val) > 1.0:
+                print(f"[TEST_TABLE] 📊 {test_type}: {old_val:.2f} → {new_val:.2f}")
+        
+        # 🔥 FORZAR ACTUALIZACIÓN DE VALORES PATRÓN EN TIEMPO REAL
+        self.update_pattern_values_only()
+        
+        # 🔥 SI HAY FILAS Y NO HAY TIPO DE PRUEBA, INTENTAR DETECTAR AUTOMÁTICAMENTE
+        if self.rows and not self.current_test_type:
+            # Detectar el tipo con mayor valor
+            max_value = max(q1, q2, q3, q4)
+            if max_value > 5.0:  # Solo si hay un valor significativo
+                if max_value == q1:
+                    auto_type = "Q1"
+                elif max_value == q2:
+                    auto_type = "Q2"
+                elif max_value == q3:
+                    auto_type = "Q3"
+                elif max_value == q4:
+                    auto_type = "Q4"
+                
+                print(f"[TEST_TABLE] 🤖 Auto-detectando tipo de prueba: {auto_type} (valor: {max_value:.2f})")
+                # 🔥 ESTABLECER AUTOMÁTICAMENTE EL TIPO SI ES MUY CLARO
+                if max_value > 10.0:  # Solo si el valor es muy claro
+                    print(f"[TEST_TABLE] 🎯 Auto-estableciendo tipo de prueba: {auto_type}")
+                    self.set_test_type_from_calibration(auto_type)
+
+
+    def update_pattern_values_only(self):
+        """🔥 MEJORADA: Actualiza SOLO los valores patrón y errores sin recrear toda la tabla"""
+        try:
+            for row_idx in range(len(self.rows)):
+                # 🔥 OBTENER NUEVO VALOR PATRÓN
+                pattern_volume = self.get_pattern_volume_for_row(row_idx)
+                
+                # 🔥 ACTUALIZAR EL VALOR EN EL ARRAY
+                if row_idx < len(self.rows):
+                    old_pattern = self.rows[row_idx][5]
+                    new_pattern = f"{pattern_volume:.2f}"
+                    
+                    # Solo actualizar si cambió significativamente
+                    try:
+                        if abs(float(new_pattern) - float(old_pattern)) > 0.1:
+                            self.rows[row_idx][5] = new_pattern
+                            print(f"[TEST_TABLE] 🔄 Fila {row_idx} patrón: {old_pattern} → {new_pattern}")
+                    except:
+                        self.rows[row_idx][5] = new_pattern
+                
+                # 🔥 ACTUALIZAR WIDGET DE VOLUMEN PATRÓN SI EXISTE
+                if row_idx in self.pattern_volume_cells:
+                    pattern_cell = self.pattern_volume_cells[row_idx]
+                    if hasattr(pattern_cell, 'value'):
+                        pattern_cell.value = f"{pattern_volume:.2f}"
+                        try:
+                            pattern_cell.update()
+                        except:
+                            pass
+                
+                # 🔥 RECALCULAR ERROR
+                row = self.rows[row_idx]
+                error, status_text, status_color = self.calculate_error(row[3], row[4], pattern_volume, row[2])
+                
+                # 🔥 ACTUALIZAR ERROR EN EL ARRAY
+                self.rows[row_idx][6] = str(error)
+                self.rows[row_idx][7] = status_text
+                
+                # 🔥 ACTUALIZAR WIDGET DE ERROR SI EXISTE
+                if row_idx in self.error_cells:
+                    error_cell = self.error_cells[row_idx]
+                    if hasattr(error_cell, 'value'):
+                        error_cell.value = str(error)
+                        try:
+                            error_cell.update()
+                        except:
+                            pass
+                
+                # 🔥 ACTUALIZAR WIDGET DE ESTADO SI EXISTE
+                if row_idx in self.status_cells:
+                    status_container = self.status_cells[row_idx]
+                    if hasattr(status_container, 'content') and hasattr(status_container.content, 'value'):
+                        status_container.content.value = status_text
+                        status_container.content.color = "white"
+                        status_container.bgcolor = status_color
+                        try:
+                            status_container.update()
+                        except:
+                            pass
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error actualizando valores patrón: {e}")
+
+    def get_pattern_volume_for_row(self, row_idx):
+        """🔥 MEJORADA: Obtiene el volumen patrón con mejor manejo de valores"""
+        try:
+            if row_idx >= len(self.rows):
+                return 0.1
+                
+            test_type = self.rows[row_idx][2]
+            if not test_type or test_type == "Escoja una opción":
+                return 0.1
+            
+            # 🔥 PRIORIDAD 1: MÓDULO DE VALORES INSTANTÁNEOS
+            if self.instant_values_module:
+                try:
+                    module_value = self.instant_values_module.get_pattern_value_for_test(test_type)
+                    if module_value > 0.1:
+                        return module_value
+                except Exception as e:
+                    print(f"[TEST_TABLE] ⚠️ Error obteniendo valor del módulo: {e}")
+            
+            # 🔥 PRIORIDAD 2: VALORES LOCALES
+            instant_volume = self.instant_values.get(test_type, 0.1)
+            if instant_volume > 0.1:
+                return instant_volume
+            
+            # 🔥 ÚLTIMO RECURSO
+            return 0.1
+                    
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error obteniendo volumen patrón: {e}")
+            return 0.1
 
     def recalculate_errors(self, e):
         """🔥 FUNCIÓN PARA RECALCULAR ERRORES MANUALMENTE"""
         print(f"[TEST_TABLE] 🔄 Recalculando errores manualmente...")
         print(f"[TEST_TABLE] 📊 Valores instantáneos actuales: {self.instant_values}")
-        print(f"[TEST_TABLE] 📚 Volúmenes guardados: {self.saved_pattern_values}")
         self.update_table()
     
         # 🔥 FORZAR UPDATE COMPLETO

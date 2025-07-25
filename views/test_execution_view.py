@@ -35,10 +35,56 @@ class TestExecutionView:
         
     def init_modules(self):
         """Inicializa todos los módulos"""
-        # 🔥 CREAR LA TABLA PRIMERO
-        self.test_table = create_test_table_module(
-            self.on_table_data_changed
-        )
+        # 🔥 CREAR MÓDULO DE VALORES INSTANTÁNEOS UNA SOLA VEZ
+        self.instant_values = create_instant_values_module()
+        print("[TEST_EXEC] ✅ Módulo de valores instantáneos creado")
+
+        # 🔥 CREAR LA TABLA DESPUÉS
+        self.test_table = create_test_table_module(self.on_table_data_changed)
+        print("[TEST_EXEC] ✅ Módulo de tabla creado")
+
+        # 🔥 CONECTAR TABLA CON MÓDULO DE VALORES INSTANTÁNEOS
+        self.test_table.set_instant_values_module(self.instant_values)
+        print("[TEST_EXEC] 🔗 Tabla conectada con módulo de valores instantáneos")
+
+        # 🔥 CONFIGURAR CALLBACK DE VALORES INSTANTÁNEOS HACIA LA TABLA
+        def send_values_to_table(q1, q2, q3, q4):
+            """Callback que envía valores instantáneos a la tabla"""
+            try:
+                # 🔥 ENVIAR VALORES DIRECTAMENTE A LA TABLA
+                self.test_table.update_instant_values(q1, q2, q3, q4)
+            except Exception as e:
+                print(f"[TEST_EXEC] ❌ Error enviando valores a tabla: {e}")
+
+        # 🔥 CONFIGURAR EL CALLBACK EN EL MÓDULO DE VALORES INSTANTÁNEOS
+        self.instant_values.set_value_callback(send_values_to_table)
+        print("[TEST_EXEC] 🔗 Callback de valores instantáneos configurado")
+
+        # 🔥 VERIFICACIÓN EXHAUSTIVA DE LA CONEXIÓN
+        if hasattr(self.test_table, 'instant_values_module') and self.test_table.instant_values_module:
+            print("[TEST_EXEC] ✅ Verificación de conexión exitosa")
+            
+            # 🔥 VERIFICAR QUE LAS FUNCIONES EXISTAN
+            required_functions = ['get_pattern_value_for_test', 'get_current_values', 'debug_all_values']
+            for func_name in required_functions:
+                if hasattr(self.test_table.instant_values_module, func_name):
+                    print(f"[TEST_EXEC] ✅ Función {func_name} disponible")
+                else:
+                    print(f"[TEST_EXEC] ❌ Función {func_name} NO disponible")
+            
+            # 🔥 PROBAR LA FUNCIÓN DE OBTENER VALORES
+            try:
+                test_values = self.test_table.instant_values_module.get_current_values()
+                print(f"[TEST_EXEC] 🧪 Prueba de valores exitosa: {test_values}")
+                
+                # 🔥 PROBAR FUNCIÓN ESPECÍFICA
+                test_pattern = self.test_table.instant_values_module.get_pattern_value_for_test("Q4")
+                print(f"[TEST_EXEC] 🧪 Prueba de patrón Q4: {test_pattern}")
+                
+            except Exception as e:
+                print(f"[TEST_EXEC] ❌ Error en prueba de conexión: {e}")
+        else:
+            print("[TEST_EXEC] ❌ La conexión no se estableció correctamente")
         
         # 🔥 CONFIGURAR CALLBACK MODBUS PARA LA TABLA
         def send_modbus_command(bit):
@@ -68,6 +114,11 @@ class TestExecutionView:
         # 🔥 CONFIGURAR EL CALLBACK EN LA TABLA
         self.test_table.set_modbus_callback(send_modbus_command)
         
+        # 🔥 ACTUALIZAR STATUS DEL MEDIDOR DESDE BATCH DATA
+        if hasattr(self.test_data, 'get') and self.test_data.get('batch'):
+            meter_status = self.test_data['batch'].lower()
+            self.test_table.update_meter_status_from_batch(meter_status)
+        
         # 🔥 CREAR MODE_SELECTION PASANDO LA REFERENCIA A LA TABLA
         self.mode_selection = create_mode_selection_module(
             self.operation_mode,
@@ -86,9 +137,6 @@ class TestExecutionView:
             self.on_end_session
         )
         
-        # Módulo de valores instantáneos
-        self.instant_values = create_instant_values_module()
-        
         # Módulo de timer
         self.timer_module = create_timer_module(
             self.on_timer_finished
@@ -98,6 +146,8 @@ class TestExecutionView:
         self.history_module = create_test_history_module(
             self.completed_tests
         )
+        
+        print("[TEST_EXEC] ✅ Todos los módulos inicializados correctamente")
     
     def on_mode_changed(self, new_mode):
         """Maneja cambios en el modo de operación"""
