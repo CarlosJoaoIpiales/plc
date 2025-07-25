@@ -99,14 +99,6 @@ class TestExecutionView:
         # 🔥 DEBUG: MOSTRAR CONFIGURACIONES DISPONIBLES
         self.test_table.debug_show_configurations()
 
-        # 🔥 ELIMINAR ESTAS LÍNEAS QUE CAUSAN AUTO-CONFIGURACIÓN
-        # timer_test_result = self.test_table.test_timer_functionality()
-        # if timer_test_result:
-        #     print("[TEST_EXEC] ✅ Timer funcionando correctamente")
-        # else:
-        #     print("[TEST_EXEC] ⚠️ Problema con el timer")
-
-        # 🔥 SOLO DEBUG SIN CONFIGURACIÓN AUTOMÁTICA
         print("[TEST_EXEC] 📊 Sistema listo - esperando calibración manual")
 
         # 🔥 VERIFICACIÓN EXHAUSTIVA DE LA CONEXIÓN (SIN EJECUTAR FUNCIONES)
@@ -120,17 +112,6 @@ class TestExecutionView:
                     print(f"[TEST_EXEC] ✅ Función {func_name} disponible")
                 else:
                     print(f"[TEST_EXEC] ❌ Función {func_name} NO disponible")
-            
-            # 🔥 ELIMINAR ESTAS PRUEBAS QUE PUEDEN CAUSAR PROBLEMAS
-            # try:
-            #     test_values = self.test_table.instant_values_module.get_current_values()
-            #     print(f"[TEST_EXEC] 🧪 Prueba de valores exitosa: {test_values}")
-            #     
-            #     test_pattern = self.test_table.instant_values_module.get_pattern_value_for_test("Q4")
-            #     print(f"[TEST_EXEC] 🧪 Prueba de patrón Q4: {test_pattern}")
-            #     
-            # except Exception as e:
-            #     print(f"[TEST_EXEC] ❌ Error en prueba de conexión: {e}")
         else:
             print("[TEST_EXEC] ❌ La conexión no se estableció correctamente")
         
@@ -168,12 +149,13 @@ class TestExecutionView:
             self.test_table.update_meter_status_from_batch(meter_status)
         
         # 🔥 CREAR MODE_SELECTION PASANDO LA REFERENCIA A LA TABLA
+        print("[TEST_EXEC] 🔄 Creando módulo de selección de modo...")
         self.mode_selection = create_mode_selection_module(
             self.operation_mode,
             self.on_mode_changed,
             table_widget=self.test_table  # 🔥 PASAR LA TABLA AQUÍ
         )
-        print("[TEST_EXEC] ✅ Módulo de selección de modo creado")
+        print(f"[TEST_EXEC] ✅ Módulo de selección de modo creado: {type(self.mode_selection)}")
         
         # Módulo de botones de pruebas
         self.test_buttons = create_test_buttons_module(
@@ -615,34 +597,37 @@ class TestExecutionView:
             
             # 🔥 CONSTRUIR TODOS LOS COMPONENTES CON DEBUG ESPECÍFICO
             try:
-                instant_values_build = self.instant_values.build()
+                # 🔥 VERIFICAR SI TIENE BUILD() O USAR DIRECTAMENTE
+                if hasattr(self.instant_values, 'build'):
+                    instant_values_build = self.instant_values.build()
+                else:
+                    instant_values_build = self.instant_values
                 print("[TEST_EXEC] ✅ Valores instantáneos construidos")
             except Exception as e:
                 print(f"[TEST_EXEC] ❌ Error construyendo valores instantáneos: {e}")
                 instant_values_build = ft.Container(ft.Text("Error en valores instantáneos"), bgcolor=ft.Colors.RED_100)
             
             try:
-                test_table_build = self.test_table.build()
+                # 🔥 VERIFICAR SI TIENE BUILD() O USAR DIRECTAMENTE
+                if hasattr(self.test_table, 'build'):
+                    test_table_build = self.test_table.build()
+                else:
+                    test_table_build = self.test_table
                 print("[TEST_EXEC] ✅ Tabla de pruebas construida")
             except Exception as e:
                 print(f"[TEST_EXEC] ❌ Error construyendo tabla: {e}")
                 test_table_build = ft.Container(ft.Text("Error en tabla de pruebas"), bgcolor=ft.Colors.RED_100)
             
-            # 🔥 DEBUG ESPECÍFICO PARA MODE_SELECTION
+            # 🔥 MODE_SELECTION - USAR DIRECTAMENTE (NO TIENE BUILD())
             try:
                 print(f"[TEST_EXEC] 🔍 Debug mode_selection:")
                 print(f"  • Tipo: {type(self.mode_selection)}")
                 print(f"  • Tiene build(): {hasattr(self.mode_selection, 'build')}")
                 
-                if hasattr(self.mode_selection, 'build'):
-                    mode_selection_build = self.mode_selection.build()
-                    print("[TEST_EXEC] ✅ Mode selection construido con build()")
-                else:
-                    mode_selection_build = self.mode_selection
-                    print("[TEST_EXEC] ✅ Mode selection usado directamente")
+                # 🔥 MODE_SELECTION RETORNA UN CONTAINER DIRECTAMENTE
+                mode_selection_build = self.mode_selection
+                print(f"[TEST_EXEC] ✅ Mode selection usado directamente: {type(mode_selection_build)}")
                     
-                print(f"[TEST_EXEC] 🔍 Resultado mode_selection: {type(mode_selection_build)}")
-                
             except Exception as e:
                 print(f"[TEST_EXEC] ❌ Error construyendo selección de modo: {e}")
                 import traceback
@@ -654,7 +639,11 @@ class TestExecutionView:
                 )
             
             try:
-                test_buttons_build = self.test_buttons.build()
+                # 🔥 VERIFICAR SI TIENE BUILD() O USAR DIRECTAMENTE
+                if hasattr(self.test_buttons, 'build'):
+                    test_buttons_build = self.test_buttons.build()
+                else:
+                    test_buttons_build = self.test_buttons
                 print("[TEST_EXEC] ✅ Botones de prueba construidos")
             except Exception as e:
                 print(f"[TEST_EXEC] ❌ Error construyendo botones: {e}")
@@ -676,13 +665,10 @@ class TestExecutionView:
                         padding=ft.padding.only(bottom=20),
                     ),
                     
-                    # 🔥 FILA 1: MODE SELECTION (RESPONSIVA) - CON DEBUG
+                    # 🔥 FILA 1: MODE SELECTION (RESPONSIVA) - USAR DIRECTAMENTE
                     ft.ResponsiveRow([
                         ft.Container(
-                            content=mode_selection_build,
-                            bgcolor=ft.Colors.PURPLE_100,
-                            border_radius=12,
-                            padding=10,
+                            content=mode_selection_build,  # 🔥 YA ES UN CONTAINER
                             margin=ft.margin.only(bottom=15),
                             col=12,  # Ocupa toda la fila en cualquier tamaño
                         )
