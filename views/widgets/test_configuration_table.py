@@ -42,6 +42,7 @@ def test_configuration_table(q1=0, q2=0, q3=0, q4=0):
         # Asegura que las columnas no se expandan forzadamente:
         horizontal_lines=None,  # Opcional: elimina líneas horizontales si no son necesarias
     )
+    
 
     def calculate_time_from_volume(test_type, volume_liters):
         """Calcula el tiempo usando regla de 3 y convierte decimales a minutos:segundos"""

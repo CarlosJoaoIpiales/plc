@@ -39,9 +39,45 @@ class TestExecutionView:
         self.instant_values = create_instant_values_module()
         print("[TEST_EXEC] ✅ Módulo de valores instantáneos creado")
 
+        # 🔥 CREAR TIMER PRIMERO
+        self.timer_module = create_timer_module(self.on_timer_finished)
+        print("[TEST_EXEC] ✅ Módulo de timer creado")
+
         # 🔥 CREAR LA TABLA DESPUÉS
         self.test_table = create_test_table_module(self.on_table_data_changed)
         print("[TEST_EXEC] ✅ Módulo de tabla creado")
+
+        # 🔥 CONECTAR TIMER CON LA TABLA
+        self.test_table.set_timer_module(self.timer_module)
+        print("[TEST_EXEC] 🔗 Timer conectado con tabla")
+
+        # 🔥 ESTABLECER REFERENCIA A LA PÁGINA PARA ACCESO A CONFIGURACIONES
+        self.test_table.set_page_reference(self.page)
+        print("[TEST_EXEC] 🔗 Referencia de página establecida en tabla")
+
+        # 🔥 GUARDAR CONFIGURACIONES EN LA SESIÓN DE LA PÁGINA - CORREGIDO
+        try:
+            # 🔥 USAR EL MÉTODO SET DE SESSIONSTORAGE
+            if hasattr(self.page, 'session') and hasattr(self.page.session, 'set'):
+                self.page.session.set("test_configurations", self.test_configurations)
+                print(f"[TEST_EXEC] 💾 Guardadas {len(self.test_configurations)} configuraciones en sesión (método .set)")
+            else:
+                # 🔥 ALTERNATIVA: USAR ATRIBUTO DE LA CLASE PARA PASAR CONFIGURACIONES
+                self.test_table.set_test_configurations_directly(self.test_configurations)
+                print(f"[TEST_EXEC] 💾 Configuraciones pasadas directamente a la tabla: {len(self.test_configurations)}")
+        except Exception as e:
+            print(f"[TEST_EXEC] ⚠️ Error guardando en sesión: {e}")
+            # 🔥 FALLBACK: PASAR CONFIGURACIONES DIRECTAMENTE
+            self.test_table.set_test_configurations_directly(self.test_configurations)
+            print(f"[TEST_EXEC] 💾 Configuraciones pasadas como fallback: {len(self.test_configurations)}")
+        
+        # 🔥 DEBUG: MOSTRAR CONFIGURACIONES GUARDADAS
+        print(f"[TEST_EXEC] 🔍 === DEBUG CONFIGURACIONES GUARDADAS ===")
+        for i, config in enumerate(self.test_configurations):
+            print(f"[TEST_EXEC] {i+1}. {config.get('test_name', 'Sin nombre')}")
+            print(f"    • Tipo: {config.get('test_type', 'N/A')}")
+            print(f"    • Volumen: {config.get('volume', 0)} L")
+            print(f"    • Tiempo: {config.get('estimated_time', 0):.2f} min")
 
         # 🔥 CONECTAR TABLA CON MÓDULO DE VALORES INSTANTÁNEOS
         self.test_table.set_instant_values_module(self.instant_values)
@@ -60,11 +96,24 @@ class TestExecutionView:
         self.instant_values.set_value_callback(send_values_to_table)
         print("[TEST_EXEC] 🔗 Callback de valores instantáneos configurado")
 
-        # 🔥 VERIFICACIÓN EXHAUSTIVA DE LA CONEXIÓN
+        # 🔥 DEBUG: MOSTRAR CONFIGURACIONES DISPONIBLES
+        self.test_table.debug_show_configurations()
+
+        # 🔥 ELIMINAR ESTAS LÍNEAS QUE CAUSAN AUTO-CONFIGURACIÓN
+        # timer_test_result = self.test_table.test_timer_functionality()
+        # if timer_test_result:
+        #     print("[TEST_EXEC] ✅ Timer funcionando correctamente")
+        # else:
+        #     print("[TEST_EXEC] ⚠️ Problema con el timer")
+
+        # 🔥 SOLO DEBUG SIN CONFIGURACIÓN AUTOMÁTICA
+        print("[TEST_EXEC] 📊 Sistema listo - esperando calibración manual")
+
+        # 🔥 VERIFICACIÓN EXHAUSTIVA DE LA CONEXIÓN (SIN EJECUTAR FUNCIONES)
         if hasattr(self.test_table, 'instant_values_module') and self.test_table.instant_values_module:
             print("[TEST_EXEC] ✅ Verificación de conexión exitosa")
             
-            # 🔥 VERIFICAR QUE LAS FUNCIONES EXISTAN
+            # 🔥 VERIFICAR QUE LAS FUNCIONES EXISTAN (PERO NO EJECUTARLAS)
             required_functions = ['get_pattern_value_for_test', 'get_current_values', 'debug_all_values']
             for func_name in required_functions:
                 if hasattr(self.test_table.instant_values_module, func_name):
@@ -72,17 +121,16 @@ class TestExecutionView:
                 else:
                     print(f"[TEST_EXEC] ❌ Función {func_name} NO disponible")
             
-            # 🔥 PROBAR LA FUNCIÓN DE OBTENER VALORES
-            try:
-                test_values = self.test_table.instant_values_module.get_current_values()
-                print(f"[TEST_EXEC] 🧪 Prueba de valores exitosa: {test_values}")
-                
-                # 🔥 PROBAR FUNCIÓN ESPECÍFICA
-                test_pattern = self.test_table.instant_values_module.get_pattern_value_for_test("Q4")
-                print(f"[TEST_EXEC] 🧪 Prueba de patrón Q4: {test_pattern}")
-                
-            except Exception as e:
-                print(f"[TEST_EXEC] ❌ Error en prueba de conexión: {e}")
+            # 🔥 ELIMINAR ESTAS PRUEBAS QUE PUEDEN CAUSAR PROBLEMAS
+            # try:
+            #     test_values = self.test_table.instant_values_module.get_current_values()
+            #     print(f"[TEST_EXEC] 🧪 Prueba de valores exitosa: {test_values}")
+            #     
+            #     test_pattern = self.test_table.instant_values_module.get_pattern_value_for_test("Q4")
+            #     print(f"[TEST_EXEC] 🧪 Prueba de patrón Q4: {test_pattern}")
+            #     
+            # except Exception as e:
+            #     print(f"[TEST_EXEC] ❌ Error en prueba de conexión: {e}")
         else:
             print("[TEST_EXEC] ❌ La conexión no se estableció correctamente")
         
@@ -125,6 +173,7 @@ class TestExecutionView:
             self.on_mode_changed,
             table_widget=self.test_table  # 🔥 PASAR LA TABLA AQUÍ
         )
+        print("[TEST_EXEC] ✅ Módulo de selección de modo creado")
         
         # Módulo de botones de pruebas
         self.test_buttons = create_test_buttons_module(
@@ -136,18 +185,16 @@ class TestExecutionView:
             self.on_view_history,
             self.on_end_session
         )
-        
-        # Módulo de timer
-        self.timer_module = create_timer_module(
-            self.on_timer_finished
-        )
+        print("[TEST_EXEC] ✅ Módulo de botones de pruebas creado")
         
         # Módulo de historial
         self.history_module = create_test_history_module(
             self.completed_tests
         )
+        print("[TEST_EXEC] ✅ Módulo de historial creado")
         
         print("[TEST_EXEC] ✅ Todos los módulos inicializados correctamente")
+
     
     def on_mode_changed(self, new_mode):
         """Maneja cambios en el modo de operación"""
@@ -550,84 +597,189 @@ class TestExecutionView:
         ], spacing=10)
         
     def build(self):
-        """Construye la vista completa con diseño completamente responsivo"""
-        return ft.Container(
-            content=ft.Column([
-                # 🔥 TÍTULO CENTRADO RESPONSIVO
-                ft.Container(
-                    content=ft.Text(
-                        "Ejecución de Pruebas",
-                        size=28,
-                        weight="bold",
-                        text_align="center",
-                        color=ft.Colors.BLUE_900
-                    ),
-                    alignment=ft.alignment.center,
-                    padding=ft.padding.only(bottom=20),
-                ),
-                
-                # 🔥 FILA 1: MODE SELECTION (RESPONSIVA)
-                ft.ResponsiveRow([
-                    ft.Container(
-                        content=self.mode_selection,
-                        bgcolor=ft.Colors.PURPLE_100,
-                        border_radius=12,
-                        padding=10,
-                        margin=ft.margin.only(bottom=15),
-                        col=12,  # Ocupa toda la fila en cualquier tamaño
+        """🔥 MEJORADA: Construye la vista completa con debug del mode_selection"""
+        try:
+            print("[TEST_EXEC] 🔨 Construyendo vista de ejecución...")
+            
+            # 🔥 VERIFICAR QUE TODOS LOS MÓDULOS ESTÉN INICIALIZADOS
+            required_modules = ['instant_values', 'timer_module', 'test_table', 'mode_selection', 'test_buttons', 'history_module']
+            for module_name in required_modules:
+                if not hasattr(self, module_name):
+                    print(f"[TEST_EXEC] ❌ Módulo {module_name} no inicializado")
+                    return ft.Container(
+                        content=ft.Text(f"Error: Módulo {module_name} no disponible", color=ft.Colors.RED),
+                        padding=20
                     )
-                ]),
+                else:
+                    print(f"[TEST_EXEC] ✅ Módulo {module_name} disponible")
+            
+            # 🔥 CONSTRUIR TODOS LOS COMPONENTES CON DEBUG ESPECÍFICO
+            try:
+                instant_values_build = self.instant_values.build()
+                print("[TEST_EXEC] ✅ Valores instantáneos construidos")
+            except Exception as e:
+                print(f"[TEST_EXEC] ❌ Error construyendo valores instantáneos: {e}")
+                instant_values_build = ft.Container(ft.Text("Error en valores instantáneos"), bgcolor=ft.Colors.RED_100)
+            
+            try:
+                test_table_build = self.test_table.build()
+                print("[TEST_EXEC] ✅ Tabla de pruebas construida")
+            except Exception as e:
+                print(f"[TEST_EXEC] ❌ Error construyendo tabla: {e}")
+                test_table_build = ft.Container(ft.Text("Error en tabla de pruebas"), bgcolor=ft.Colors.RED_100)
+            
+            # 🔥 DEBUG ESPECÍFICO PARA MODE_SELECTION
+            try:
+                print(f"[TEST_EXEC] 🔍 Debug mode_selection:")
+                print(f"  • Tipo: {type(self.mode_selection)}")
+                print(f"  • Tiene build(): {hasattr(self.mode_selection, 'build')}")
                 
-                # 🔥 FILA 2: BOTONES DE PRUEBAS (RESPONSIVA)
-                ft.ResponsiveRow([
-                    ft.Container(
-                        content=self.test_buttons.build(),
-                        margin=ft.margin.only(bottom=15),
-                        col=12,  # Ocupa toda la fila
-                    )
-                ]),
-                ft.ResponsiveRow([
-                    ft.Container(
-                        content=self.create_calculated_flows_display(),
-                        margin=ft.margin.only(bottom=15),
-                        col=12,  # Ocupa toda la fila
-                    )
-                ]),
+                if hasattr(self.mode_selection, 'build'):
+                    mode_selection_build = self.mode_selection.build()
+                    print("[TEST_EXEC] ✅ Mode selection construido con build()")
+                else:
+                    mode_selection_build = self.mode_selection
+                    print("[TEST_EXEC] ✅ Mode selection usado directamente")
+                    
+                print(f"[TEST_EXEC] 🔍 Resultado mode_selection: {type(mode_selection_build)}")
                 
-                # 🔥 FILA 3: GRID PRINCIPAL RESPONSIVO
-                ft.ResponsiveRow([
-                    # 🔥 COLUMNA 1: VALORES INSTANTÁNEOS
+            except Exception as e:
+                print(f"[TEST_EXEC] ❌ Error construyendo selección de modo: {e}")
+                import traceback
+                traceback.print_exc()
+                mode_selection_build = ft.Container(
+                    content=ft.Text(f"Error en selección de modo: {str(e)}", color=ft.Colors.RED),
+                    bgcolor=ft.Colors.RED_100,
+                    padding=20
+                )
+            
+            try:
+                test_buttons_build = self.test_buttons.build()
+                print("[TEST_EXEC] ✅ Botones de prueba construidos")
+            except Exception as e:
+                print(f"[TEST_EXEC] ❌ Error construyendo botones: {e}")
+                test_buttons_build = ft.Container(ft.Text("Error en botones de prueba"), bgcolor=ft.Colors.RED_100)
+            
+            # 🔥 CREAR LA ESTRUCTURA PRINCIPAL
+            main_view = ft.Container(
+                content=ft.Column([
+                    # 🔥 TÍTULO CENTRADO RESPONSIVO
                     ft.Container(
-                        content=self.instant_values.build(),
-                        col={"xs": 12, "md": 3},  # 100% en móvil, 25% en escritorio
-                        padding=ft.padding.only(right=10),
+                        content=ft.Text(
+                            "Ejecución de Pruebas",
+                            size=28,
+                            weight="bold",
+                            text_align="center",
+                            color=ft.Colors.BLUE_900
+                        ),
+                        alignment=ft.alignment.center,
+                        padding=ft.padding.only(bottom=20),
                     ),
                     
-                    # 🔥 COLUMNA 2: ÁREA PRINCIPAL
-                    ft.Container(
-                        content=ft.Column([
-                            
-                            # 🔥 SUB-FILA 3: TABLA DE PRUEBAS
-                            ft.Container(
-                                content=self.test_table.build(),
-                                margin=ft.margin.only(top=15),
-                            ),
-                            
-                        ], spacing=15),
-                        col={"xs": 12, "md": 9},  # 100% en móvil, 75% en escritorio
-                    ),
-                ], spacing=20),
-                
-            ], 
-            spacing=0,
-            scroll=ft.ScrollMode.AUTO,  # Scroll automático para contenido largo
-            ),
-            padding=ft.padding.symmetric(horizontal=20, vertical=10),
+                    # 🔥 FILA 1: MODE SELECTION (RESPONSIVA) - CON DEBUG
+                    ft.ResponsiveRow([
+                        ft.Container(
+                            content=mode_selection_build,
+                            bgcolor=ft.Colors.PURPLE_100,
+                            border_radius=12,
+                            padding=10,
+                            margin=ft.margin.only(bottom=15),
+                            col=12,  # Ocupa toda la fila en cualquier tamaño
+                        )
+                    ]),
+                    
+                    # 🔥 FILA 2: BOTONES DE PRUEBAS (RESPONSIVA)
+                    ft.ResponsiveRow([
+                        ft.Container(
+                            content=test_buttons_build,
+                            margin=ft.margin.only(bottom=15),
+                            col=12,  # Ocupa toda la fila
+                        )
+                    ]),
+                    
+                    # 🔥 FILA 3: CONFIGURACIONES
+                    ft.ResponsiveRow([
+                        ft.Container(
+                            content=self.create_calculated_flows_display(),
+                            margin=ft.margin.only(bottom=15),
+                            col=12,  # Ocupa toda la fila
+                        )
+                    ]),
+                    
+                    # 🔥 FILA 4: GRID PRINCIPAL RESPONSIVO
+                    ft.ResponsiveRow([
+                        # 🔥 COLUMNA 1: VALORES INSTANTÁNEOS
+                        ft.Container(
+                            content=instant_values_build,
+                            col={"xs": 12, "md": 3},  # 100% en móvil, 25% en escritorio
+                            padding=ft.padding.only(right=10),
+                        ),
+                        
+                        # 🔥 COLUMNA 2: ÁREA PRINCIPAL
+                        ft.Container(
+                            content=ft.Column([
+                                # 🔥 SUB-FILA: TABLA DE PRUEBAS
+                                ft.Container(
+                                    content=test_table_build,
+                                    margin=ft.margin.only(top=15),
+                                ),
+                            ], spacing=15),
+                            col={"xs": 12, "md": 9},  # 100% en móvil, 75% en escritorio
+                        ),
+                    ], spacing=20),
+                    
+                ], 
+                spacing=0,
+                scroll=ft.ScrollMode.AUTO,  # Scroll automático para contenido largo
+                ),
+                padding=ft.padding.symmetric(horizontal=20, vertical=10),
+                alignment=ft.alignment.center,
+                expand=True,
+            )
+            
+            print("[TEST_EXEC] ✅ Vista construida exitosamente")
+            return main_view
+            
+        except Exception as e:
+            print(f"[TEST_EXEC] ❌ Error crítico construyendo vista: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            return ft.Container(
+                content=ft.Column([
+                    ft.Text("Error crítico en la vista de ejecución", size=20, color=ft.Colors.RED, weight="bold"),
+                    ft.Text(f"Error: {str(e)}", size=14, color=ft.Colors.RED_700),
+                    ft.ElevatedButton(
+                        "Recargar",
+                        on_click=lambda e: self.page.update(),
+                        bgcolor=ft.Colors.BLUE_600,
+                        color=ft.Colors.WHITE
+                    )
+                ], spacing=20, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                padding=40,
+                alignment=ft.alignment.center,
+                expand=True,
+            )
+
+def get_test_execution_view(page, test_data):
+    """🔥 MEJORADA: Función principal para obtener la vista de ejecución"""
+    try:
+        print("[TEST_EXEC] 🚀 Creando vista de ejecución...")
+        view = TestExecutionView(page, test_data)
+        built_view = view.build()
+        print("[TEST_EXEC] ✅ Vista de ejecución creada exitosamente")
+        return built_view
+    except Exception as e:
+        print(f"[TEST_EXEC] ❌ Error creando vista: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return ft.Container(
+            content=ft.Column([
+                ft.Text("Error inicializando vista de ejecución", size=20, color=ft.Colors.RED, weight="bold"),
+                ft.Text(f"Error: {str(e)}", size=14, color=ft.Colors.RED_700),
+            ], spacing=20, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=40,
             alignment=ft.alignment.center,
             expand=True,
         )
-
-def get_test_execution_view(page, test_data):
-    """Función principal para obtener la vista de ejecución"""
-    view = TestExecutionView(page, test_data)
-    return view.build()

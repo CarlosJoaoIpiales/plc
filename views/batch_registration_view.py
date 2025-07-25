@@ -559,6 +559,43 @@ def get_batch_registration_view(page, on_continue):
             confirm_dialog.open = False
             page.update()
             
+            # 🔥 GUARDAR TODOS LOS DATOS EN LA PÁGINA PARA ACCESO POSTERIOR
+            page.client_name = client_name
+            page.technician_name = technician_name
+            page.brand = brand.value
+            page.model = model.value
+            page.ratio = ratio.value
+            page.nominal_flow = nominal_flow.value
+            page.diameter = diameter.value
+            page.meter_type = meter_type.value
+            page.batch = batch.value
+            
+            print(f"[BATCH_REG] 💾 Datos guardados en página:")
+            print(f"  • Cliente: {client_name}")
+            print(f"  • Técnico: {technician_name}")
+            print(f"  • Marca: {brand.value}")
+            print(f"  • Modelo: {model.value}")
+            print(f"  • Ratio: {ratio.value}")
+            print(f"  • Caudal Nominal: {nominal_flow.value}")
+            print(f"  • Diámetro: {diameter.value}")
+            print(f"  • Tipo: {meter_type.value}")
+            print(f"  • Batch: {batch.value}")
+            
+            # 🔥 TAMBIÉN GUARDAR EN SESSION COMO RESPALDO
+            try:
+                page.session.set("client_name", client_name)
+                page.session.set("technician_name", technician_name)
+                page.session.set("brand", brand.value)
+                page.session.set("model", model.value)
+                page.session.set("ratio", ratio.value)
+                page.session.set("nominal_flow", nominal_flow.value)
+                page.session.set("diameter", diameter.value)
+                page.session.set("meter_type", meter_type.value)
+                page.session.set("batch", batch.value)
+                print("[BATCH_REG] 💾 Datos también guardados en session")
+            except Exception as session_error:
+                print(f"[BATCH_REG] ⚠️ Error guardando en session: {session_error}")
+            
             # 🔥 MOSTRAR DIÁLOGO DE PROGRESO
             progress_dialog = ft.AlertDialog(
                 modal=True,

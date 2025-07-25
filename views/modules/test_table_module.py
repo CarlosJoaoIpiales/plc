@@ -10,6 +10,8 @@ class TestTableModule:
         self.on_data_changed = on_data_changed
         self.current_test = None
         self.meter_status = "nuevo"  # 🔥 SE OBTIENE DE BATCH REGISTRATION
+
+        self.test_configurations_direct = []
         
         # 🔥 ESTRUCTURA DE FILAS: [#, Serial, Tipo, Inicial, Final, Volumen_Patron, Error, Estado]
         self.rows = []
@@ -28,6 +30,10 @@ class TestTableModule:
 
         # 🔥 REFERENCIA AL MÓDULO DE VALORES INSTANTÁNEOS
         self.instant_values_module = None
+
+        # 🔥 ELIMINAR ESTA LÍNEA - EL TIMER SE ESTABLECE EXTERNAMENTE
+        # self.timer_module = create_timer_module(self._on_timer_finished)
+        self.timer_module = None  # 🔥 SE ESTABLECE EXTERNAMENTE
         
         # 🔥 MAPEO DE TIPOS DE PRUEBA A VALORES INSTANTÁNEOS
         self.test_to_instant_mapping = {
@@ -55,18 +61,12 @@ class TestTableModule:
             "Q4": 0.1,  # 🔥 CAMBIADO DE 4000.0 A 0.1
         }
 
-        # 🔥 ELIMINAR: saved_pattern_values (YA NO SE NECESITA)
-        # 🔥 Los valores patrón ahora se obtienen directamente de instant_values en tiempo real
-
         # 🔥 ESTADO DE PRUEBAS ACTIVAS (PARA RESETEAR CUANDO INICIA NUEVA PRUEBA)
         self.active_test_type = None
         self.test_in_progress = False
 
         # 🔥 CONTADOR PARA DEBUG
         self.add_row_counter = 0
-
-        # 🔥 TIMER MODULE
-        self.timer_module = create_timer_module(self._on_timer_finished)
 
         # 🔥 NUEVA VARIABLE: REFERENCIAS A LAS CELDAS DE VOLUMEN PATRÓN
         self.pattern_volume_cells = {}  # {row_idx: Text_widget}
@@ -112,10 +112,32 @@ class TestTableModule:
             width=140,
             bgcolor=ft.Colors.RED_600,
             color="white",
-            disabled=True,
             on_click=self._on_finish_test
         )
 
+        self.end_tests_button = ft.ElevatedButton(
+            "Finalizar Pruebas",
+            width=140,
+            bgcolor=ft.Colors.DEEP_ORANGE_600,
+            color="white",
+            on_click=self._on_end_tests,
+            icon=ft.Icons.ASSIGNMENT_TURNED_IN
+        )
+
+        # 🔥 INICIALIZAR TABLA CON UNA FILA POR DEFECTO
+        self.initialize_table()
+
+
+    def set_test_configurations_directly(self, configurations):
+        """🔥 NUEVA FUNCIÓN: Establece configuraciones directamente sin usar session"""
+        self.test_configurations_direct = configurations
+        print(f"[TEST_TABLE] 📦 Configuraciones establecidas directamente: {len(configurations)}")
+
+
+    def set_timer_module(self, timer_module):
+        """🔥 NUEVA FUNCIÓN: Establece referencia al módulo de timer"""
+        self.timer_module = timer_module
+        print("[TEST_TABLE] 🔗 Timer module conectado")
 
     def create_test_button(self, name, bit):
         """🔥 NUEVA FUNCIÓN: Crea botón de prueba que envía comando Modbus"""
@@ -186,37 +208,7 @@ class TestTableModule:
         # Recalcular errores con el nuevo estado
         self.update_table()
 
-    def calculate_estimated_time(self, test_type, volume=100):
-        """🔥 NUEVA FUNCIÓN: Calcula tiempo estimado para una prueba"""
-        try:
-            # 🔥 OBTENER CAUDAL MÁXIMO PARA EL TIPO DE PRUEBA
-            current_flow = self.instant_values.get(test_type, 0)
-            
-            if current_flow <= 0:
-                print(f"[TEST_TABLE] ⚠️ Caudal para {test_type} es 0, usando default")
-                return 5  # 5 minutos por defecto
-            
-            # 🔥 CALCULAR QMAX (10% SOBRE EL CAUDAL NOMINAL)
-            qmax_lh = current_flow * 1.1  # L/h
-            
-            if qmax_lh <= 0:
-                return 5
-            
-            # 🔥 CALCULAR TIEMPO: tiempo = volumen / caudal_max
-            # Volumen en litros, caudal en L/h, resultado en horas -> convertir a minutos
-            time_hours = volume / qmax_lh
-            time_minutes = time_hours * 60
-            
-            # 🔥 MÍNIMO 1 MINUTO, MÁXIMO 30 MINUTOS
-            time_minutes = max(1, min(30, time_minutes))
-            
-            print(f"[TEST_TABLE] ⏱️ Tiempo estimado para {test_type}: {volume}L / {qmax_lh:.2f}L/h = {time_minutes:.1f} min")
-            
-            return time_minutes
-            
-        except Exception as e:
-            print(f"[TEST_TABLE] ❌ Error calculando tiempo estimado: {e}")
-            return 5  # Default 5 minutos
+    
 
     def process_calibration_message(self, message):
         """🔥 MEJORADA: Procesa mensajes de calibración Y establecimiento automático"""
@@ -285,7 +277,7 @@ class TestTableModule:
         self.set_test_type_from_calibration("Q4")        
 
     def set_test_type_from_calibration(self, test_type):
-        """🔥 CORREGIDA: Establece el tipo de prueba desde calibración del PLC"""
+        """🔥 MEJORADA: Establece el tipo de prueba y obtiene tiempo desde configuración"""
         print(f"[TEST_TABLE] 🎯 Estableciendo tipo de prueba por calibración: {test_type}")
         
         self.current_test_type = test_type
@@ -301,16 +293,119 @@ class TestTableModule:
             row[2] = test_type  # Columna de tipo de prueba
             print(f"[TEST_TABLE] 🔄 Fila {idx}: '{old_type}' → '{test_type}'")
         
-        # 🔥 CALCULAR Y CONFIGURAR TIEMPO ESTIMADO EN EL TIMER
-        estimated_time = self.calculate_estimated_time(test_type)
-        self.timer_module.set_time(estimated_time)
+        # 🔥 OBTENER TIEMPO DESDE CONFIGURACIÓN DE PRUEBAS
+        estimated_time_minutes = self.get_configured_time_for_test_type(test_type)
+        
+        # 🔥 CONFIGURAR TIEMPO EN EL TIMER SI ESTÁ DISPONIBLE
+        if self.timer_module:
+            self.timer_module.set_time(estimated_time_minutes)
+            print(f"[TEST_TABLE] ⏰ Timer configurado con {estimated_time_minutes:.1f} minutos")
+        else:
+            print(f"[TEST_TABLE] ⚠️ Timer module no disponible")
         
         # 🔥 FORZAR ACTUALIZACIÓN COMPLETA DE LA TABLA
         print(f"[TEST_TABLE] 🔄 Forzando actualización completa de tabla...")
         self.update_table()
         
         print(f"[TEST_TABLE] ✅ Tipo de prueba establecido: {test_type}")
-        print(f"[TEST_TABLE] ⏱️ Tiempo estimado configurado: {estimated_time:.1f} minutos")
+        print(f"[TEST_TABLE] ⏱️ Tiempo configurado: {estimated_time_minutes:.1f} minutos")
+
+    def get_configured_time_for_test_type(self, test_type):
+        """🔥 MEJORADA: Obtiene el tiempo configurado desde múltiples fuentes"""
+        try:
+            # 🔥 MÉTODO 1: INTENTAR OBTENER DESDE LA SESIÓN DE LA PÁGINA
+            if hasattr(self, 'page') and self.page and hasattr(self.page, 'session'):
+                try:
+                    # 🔥 INTENTAR MÉTODO GET DE SESSIONSTORAGE
+                    if hasattr(self.page.session, 'get'):
+                        test_configurations = self.page.session.get("test_configurations") or []
+                    else:
+                        test_configurations = []
+                    
+                    print(f"[TEST_TABLE] 🔍 Configuraciones desde sesión: {len(test_configurations)}")
+                    
+                    # 🔥 BUSCAR CONFIGURACIÓN DEL TIPO ESPECIFICADO
+                    for config in test_configurations:
+                        config_type = config.get("test_type")
+                        estimated_time = config.get("estimated_time", 0)
+                        
+                        if config_type == test_type:
+                            print(f"[TEST_TABLE] 📊 ✅ Tiempo encontrado en sesión para {test_type}: {estimated_time:.2f} min")
+                            return estimated_time
+                            
+                except Exception as e:
+                    print(f"[TEST_TABLE] ⚠️ Error accediendo a sesión: {e}")
+            
+            # 🔥 MÉTODO 2: USAR CONFIGURACIONES DIRECTAS
+            if hasattr(self, 'test_configurations_direct') and self.test_configurations_direct:
+                print(f"[TEST_TABLE] 🔍 Configuraciones directas disponibles: {len(self.test_configurations_direct)}")
+                
+                for config in self.test_configurations_direct:
+                    config_type = config.get("test_type")
+                    estimated_time = config.get("estimated_time", 0)
+                    
+                    print(f"[TEST_TABLE] 🔍 Revisando config directa: tipo={config_type}, tiempo={estimated_time}")
+                    
+                    if config_type == test_type:
+                        print(f"[TEST_TABLE] 📊 ✅ Tiempo encontrado en configuraciones directas para {test_type}: {estimated_time:.2f} min")
+                        return estimated_time
+            
+            # 🔥 MÉTODO 3: USAR VALORES FIJOS PARA CADA TIPO
+            default_times = {
+                "Q1": 3.0,  # 3 minutos para Q1
+                "Q2": 4.0,  # 4 minutos para Q2  
+                "Q3": 5.0,  # 5 minutos para Q3
+                "Q4": 5.0   # 5 minutos para Q4
+            }
+            
+            if test_type in default_times:
+                default_time = default_times[test_type]
+                print(f"[TEST_TABLE] 🔄 Usando tiempo por defecto para {test_type}: {default_time} minutos")
+                return default_time
+            
+            # 🔥 MÉTODO 4: CALCULAR DESDE FLUJO
+            print(f"[TEST_TABLE] ⚠️ Calculando tiempo para {test_type}...")
+            return self.calculate_estimated_time_from_flow(test_type)
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error obteniendo tiempo configurado: {e}")
+            return 5.0  # Valor por defecto
+        
+    def calculate_estimated_time_from_flow(self, test_type, default_volume=100):
+        """🔥 FUNCIÓN DE RESPALDO: Calcula tiempo usando la misma fórmula que test_configuration"""
+        try:
+            # 🔥 OBTENER CAUDAL BASE PARA EL TIPO DE PRUEBA
+            base_flow = self.instant_values.get(test_type, 0)
+            
+            if base_flow <= 0:
+                print(f"[TEST_TABLE] ⚠️ Caudal para {test_type} es 0, usando default")
+                return 5.0  # 5 minutos por defecto
+            
+            # 🔥 CALCULAR QMAX (10% SOBRE EL CAUDAL NOMINAL) - MISMA FÓRMULA QUE TEST_CONFIG
+            qmax = round(base_flow * 1.1, 2)
+            
+            if qmax <= 0:
+                return 5.0
+            
+            # 🔥 CALCULAR TIEMPO: (volumen * 60) / qmax - MISMA FÓRMULA QUE TEST_CONFIG
+            time_decimal = (default_volume * 60) / qmax
+            
+            # 🔥 MÍNIMO 1 MINUTO, MÁXIMO 30 MINUTOS
+            time_minutes = max(1.0, min(30.0, time_decimal))
+            
+            print(f"[TEST_TABLE] ⏱️ Tiempo calculado para {test_type}: {default_volume}L / {qmax:.2f}L/h = {time_minutes:.1f} min")
+            
+            return time_minutes
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error calculando tiempo estimado: {e}")
+            return 5.0  # Default 5 minutos
+        
+    def set_page_reference(self, page):
+        """🔥 NUEVA FUNCIÓN: Establece referencia a la página para acceder a sesión"""
+        self.page = page
+        print("[TEST_TABLE] 🔗 Referencia a página establecida para acceso a configuraciones")
+
 
     def debug_set_test_type(self, test_type):
         """🔥 FUNCIÓN DEBUG: Fuerza el establecimiento de un tipo de prueba"""
@@ -749,40 +844,54 @@ class TestTableModule:
             # 🔥 NO ACTUALIZAR TABLA AUTOMÁTICAMENTE PARA EVITAR PERDER FOCO
 
     def _on_start_test(self, e):
-        """🔥 MEJORADA: Inicia la prueba con validaciones"""
+        """🔥 MEJORADA: Inicia la prueba con timer de cuenta regresiva"""
         # 🔥 VALIDAR QUE HAYA UN TIPO DE PRUEBA SELECCIONADO
         if not self.current_test_type:
             print("[TEST_TABLE] ⚠️ No hay tipo de prueba seleccionado")
-            # 🔥 MOSTRAR ALERTA DE TIPO DE PRUEBA NO SELECCIONADO
-            def close_alert(e):
-                alert.open = False
-                if hasattr(alert, 'page') and alert.page is not None:
-                    alert.page.update()
-            
-            alert = ft.AlertDialog(
-                title=ft.Text("❌ Tipo de Prueba No Definido"),
-                content=ft.Text("Por favor, espere a que el sistema detecte la calibración (Q1, Q2, Q3 o Q4) antes de iniciar la prueba.", size=14),
-                actions=[ft.TextButton("Entendido", on_click=close_alert)],
+            self._show_error_alert(
+                "❌ Tipo de Prueba No Definido",
+                "Por favor, espere a que el sistema detecte la calibración (Q1, Q2, Q3 o Q4) antes de iniciar la prueba."
             )
-            
-            if hasattr(self.data_table, 'page') and self.data_table.page is not None:
-                self.data_table.page.overlay.append(alert)
-                alert.open = True
-                self.data_table.page.update()
             return
         
-        # 🔥 VALIDAR LECTURAS INICIALES
+        # 🔥 VALIDAR QUE HAY AL MENOS UNA FILA CON SERIAL
+        has_serial = any(row[1].strip() for row in self.rows)
+        if not has_serial:
+            print("[TEST_TABLE] ⚠️ No hay seriales ingresados")
+            self._show_error_alert(
+                "❌ Seriales Requeridos",
+                "Por favor, ingrese al menos un número de serie antes de iniciar la prueba."
+            )
+            return
+        
+        # 🔥 VALIDAR LECTURAS INICIALES COMPLETAS
         empty_rows = self._validate_initial_readings()
         if empty_rows:
             print(f"[TEST_TABLE] ❌ Faltan lecturas iniciales en filas: {empty_rows}")
             self._show_validation_alert(empty_rows)
             return
         
-        print("[TEST_TABLE] ✅ Validaciones pasadas, iniciando prueba...")
+        print("[TEST_TABLE] ✅ Todas las validaciones pasadas, iniciando prueba...")
         
         # 🔥 MARCAR PRUEBA COMO EN PROGRESO
         self.test_in_progress = True
         self.active_test_type = self.current_test_type
+        
+        # 🔥 VALIDAR QUE TENEMOS TIMER MODULE
+        if not self.timer_module:
+            print("[TEST_TABLE] ❌ Timer module no disponible")
+            self._show_error_alert(
+                "❌ Error del Sistema",
+                "El módulo de timer no está disponible. Contacte al administrador."
+            )
+            return
+        
+        # 🔥 OBTENER TIEMPO CONFIGURADO PARA EL TIPO DE PRUEBA ACTUAL
+        configured_time = self.get_configured_time_for_test_type(self.current_test_type)
+        
+        # 🔥 ASEGURAR QUE EL TIMER TENGA EL TIEMPO CORRECTO ANTES DE INICIAR
+        self.timer_module.set_time(configured_time)
+        print(f"[TEST_TABLE] ⏱️ Timer configurado con {configured_time:.1f} minutos para {self.current_test_type}")
         
         # 🔥 ENVIAR COMANDO M269 (INICIAR PRUEBA)
         if self.send_modbus_command:
@@ -796,8 +905,10 @@ class TestTableModule:
         self.start_test_button.disabled = True
         self.finish_test_button.disabled = False
         
-        # 🔥 INICIAR TIMER CON EL TIEMPO YA CONFIGURADO
+        # 🔥 INICIAR CUENTA REGRESIVA CON EL TIEMPO CONFIGURADO
+        print(f"[TEST_TABLE] 🚀 Iniciando cuenta regresiva de {configured_time:.1f} minutos...")
         self.timer_module.start_countdown()
+        print(f"[TEST_TABLE] ⏰ Cuenta regresiva iniciada: {configured_time:.1f} minutos")
         
         if hasattr(self, 'on_test_control'):
             self.on_test_control("start")
@@ -808,7 +919,201 @@ class TestTableModule:
         except:
             pass
             
-        print(f"[TEST_TABLE] ▶️ Prueba iniciada: {self.current_test_type}")
+        print(f"[TEST_TABLE] ▶️ Prueba iniciada: {self.current_test_type} - Tiempo: {configured_time:.1f} min")
+
+    def debug_show_configurations(self):
+        """🔥 FUNCIÓN DEBUG MEJORADA: Muestra las configuraciones desde todas las fuentes"""
+        try:
+            print(f"[TEST_TABLE] 🔍 === DEBUG CONFIGURACIONES ===")
+            
+            # 🔥 DEBUG 1: CONFIGURACIONES DIRECTAS
+            if hasattr(self, 'test_configurations_direct') and self.test_configurations_direct:
+                print(f"[TEST_TABLE] 📦 Configuraciones directas: {len(self.test_configurations_direct)}")
+                for i, config in enumerate(self.test_configurations_direct):
+                    print(f"[TEST_TABLE] {i+1}. {config.get('test_name', 'Sin nombre')}")
+                    print(f"    • Tipo: {config.get('test_type', 'N/A')}")
+                    print(f"    • Volumen: {config.get('volume', 0)} L")
+                    print(f"    • Tiempo: {config.get('estimated_time', 0):.2f} min")
+            else:
+                print(f"[TEST_TABLE] ⚠️ No hay configuraciones directas")
+            
+            # 🔥 DEBUG 2: CONFIGURACIONES DE SESIÓN
+            if hasattr(self, 'page') and self.page and hasattr(self.page, 'session'):
+                try:
+                    if hasattr(self.page.session, 'get'):
+                        test_configurations = self.page.session.get("test_configurations") or []
+                        print(f"[TEST_TABLE] 📊 Configuraciones de sesión: {len(test_configurations)}")
+                        
+                        for i, config in enumerate(test_configurations):
+                            print(f"[TEST_TABLE] S{i+1}. {config.get('test_name', 'Sin nombre')}")
+                            print(f"    • Tipo: {config.get('test_type', 'N/A')}")
+                            print(f"    • Tiempo: {config.get('estimated_time', 0):.2f} min")
+                    else:
+                        print(f"[TEST_TABLE] ⚠️ Sesión no tiene método get")
+                except Exception as e:
+                    print(f"[TEST_TABLE] ❌ Error accediendo sesión: {e}")
+            else:
+                print(f"[TEST_TABLE] ⚠️ No hay acceso a sesión")
+            
+            print(f"[TEST_TABLE] 🔍 === FIN DEBUG ===")
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error en debug configuraciones: {e}")
+
+    # 🔥 FUNCIÓN DE PRUEBA PARA VERIFICAR CONFIGURACIONES
+    def test_all_configurations(self):
+        """🔥 FUNCIÓN DE PRUEBA: Verifica todas las configuraciones disponibles"""
+        print("[TEST_TABLE] 🧪 === PRUEBA DE CONFIGURACIONES ===")
+        
+        test_types = ["Q1", "Q2", "Q3", "Q4"]
+        
+        for test_type in test_types:
+            time_result = self.get_configured_time_for_test_type(test_type)
+            print(f"[TEST_TABLE] 🧪 {test_type}: {time_result:.2f} minutos")
+        
+        print("[TEST_TABLE] 🧪 === FIN PRUEBA ===")
+
+    def _validate_initial_readings(self):
+        """🔥 MEJORADA: Valida que todas las lecturas iniciales estén llenas para filas con serial"""
+        empty_rows = []
+        
+        for idx, row in enumerate(self.rows):
+            serial = row[1].strip()
+            initial_reading = row[3].strip()
+            
+            # Solo validar filas que tienen serial
+            if serial and not initial_reading:
+                empty_rows.append(idx + 1)  # +1 para numeración humana
+        
+        return empty_rows
+
+    def _show_validation_alert(self, empty_rows):
+        """🔥 MEJORADA: Muestra alerta de validación más clara"""
+        rows_text = ", ".join([f"#{row}" for row in empty_rows])
+        message = f"⚠️ Las siguientes filas tienen números de serie pero no tienen lecturas iniciales:\n\n🔢 Filas: {rows_text}\n\n📝 Por favor, complete las lecturas iniciales antes de iniciar la prueba."
+        
+        self._show_error_alert("❌ Lecturas Iniciales Faltantes", message)
+
+    def _show_error_alert(self, title, message):
+        """🔥 NUEVA FUNCIÓN: Muestra alertas de error de forma centralizada"""
+        def close_alert(e):
+            alert.open = False
+            if hasattr(alert, 'page') and alert.page is not None:
+                alert.page.update()
+        
+        alert = ft.AlertDialog(
+            title=ft.Text(title, size=16, weight="bold"),
+            content=ft.Text(message, size=14),
+            actions=[
+                ft.TextButton("Entendido", on_click=close_alert, style=ft.ButtonStyle(color=ft.Colors.BLUE))
+            ],
+        )
+        
+        if hasattr(self.data_table, 'page') and self.data_table.page is not None:
+            self.data_table.page.overlay.append(alert)
+            alert.open = True
+            self.data_table.page.update()
+
+    def _show_completion_alert(self, test_name, summary):
+        """🔥 NUEVA FUNCIÓN: Muestra alerta de prueba completada"""
+        def close_alert(e):
+            alert.open = False
+            if hasattr(alert, 'page') and alert.page is not None:
+                alert.page.update()
+        
+        success_rate = summary['success_rate']
+        status_emoji = "🎉" if success_rate >= 80 else "⚠️" if success_rate >= 50 else "❌"
+        
+        message = f"""🧪 {test_name} completada exitosamente
+        
+📊 Resumen de Resultados:
+• Total de medidores: {summary['total']}
+• ✅ Aprobados: {summary['passed']}
+• ❌ Reprobados: {summary['failed']}
+• 📈 Tasa de éxito: {success_rate:.1f}%
+
+Los datos han sido guardados y la tabla está lista para la siguiente prueba."""
+        
+        alert = ft.AlertDialog(
+            title=ft.Text(f"{status_emoji} Prueba Completada", size=16, weight="bold"),
+            content=ft.Text(message, size=14),
+            actions=[
+                ft.TextButton("Continuar", on_click=close_alert, style=ft.ButtonStyle(color=ft.Colors.GREEN))
+            ],
+        )
+        
+        if hasattr(self.data_table, 'page') and self.data_table.page is not None:
+            self.data_table.page.overlay.append(alert)
+            alert.open = True
+            self.data_table.page.update()
+
+    def clear_data_preserve_serials(self, serials_to_preserve):
+        """🔥 MEJORADA: Limpia datos pero preserva seriales para la siguiente prueba"""
+        try:
+            print(f"[TEST_TABLE] 🧹 Limpiando datos de {len(self.rows)} filas...")
+            
+            # 🔥 LIMPIAR FILAS EXISTENTES
+            self.rows.clear()
+            
+            # 🔥 RECREAR FILAS SOLO CON SERIALES Y TIPO DE PRUEBA ACTUAL
+            for serial in serials_to_preserve:
+                test_type = self.current_test_type if self.current_test_type else ""
+                # [#, Serial, Tipo, Inicial, Final, Volumen_Patron, Error, Estado]
+                self.rows.append(["", serial, test_type, "", "", "", "", ""])
+                print(f"[TEST_TABLE] 📝 Preservado serial: {serial} para tipo: {test_type}")
+            
+            # 🔥 SI NO HAY SERIALES, CREAR AL MENOS UNA FILA VACÍA
+            if not self.rows:
+                test_type = self.current_test_type if self.current_test_type else ""
+                self.rows.append(["", "", test_type, "", "", "", "", ""])
+                print(f"[TEST_TABLE] 📝 Creada fila vacía para tipo: {test_type}")
+            
+            # 🔥 ACTUALIZAR TABLA PARA MOSTRAR LOS CAMBIOS
+            self.update_table()
+            
+            print(f"[TEST_TABLE] ✅ Datos limpiados, {len(serials_to_preserve)} seriales preservados")
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error limpiando datos: {e}")
+
+    # 🔥 FUNCIÓN ADICIONAL: Obtener resumen de todas las pruebas por tipo
+    def get_tests_summary_by_type(self):
+        """🔥 NUEVA FUNCIÓN: Obtiene resumen organizado por tipo de prueba"""
+        summary_by_type = {}
+        
+        for test_group in self.completed_tests:
+            test_type = test_group["test_type"]
+            
+            if test_type not in summary_by_type:
+                summary_by_type[test_type] = {
+                    "test_count": 0,
+                    "total_meters": 0,
+                    "passed_meters": 0,
+                    "failed_meters": 0,
+                    "success_rate": 0.0,
+                    "tests": []
+                }
+            
+            type_summary = summary_by_type[test_type]
+            type_summary["test_count"] += 1
+            type_summary["total_meters"] += test_group["summary"]["total"]
+            type_summary["passed_meters"] += test_group["summary"]["passed"]
+            type_summary["failed_meters"] += test_group["summary"]["failed"]
+            type_summary["tests"].append(test_group)
+        
+        # 🔥 CALCULAR TASAS DE ÉXITO
+        for test_type, summary in summary_by_type.items():
+            if summary["total_meters"] > 0:
+                summary["success_rate"] = (summary["passed_meters"] / summary["total_meters"]) * 100
+        
+        return summary_by_type
+
+    # 🔥 FUNCIÓN ADICIONAL: Limpiar completamente el historial
+    def clear_all_tests(self):
+        """🔥 NUEVA FUNCIÓN: Limpia todo el historial de pruebas"""
+        self.completed_tests.clear()
+        self.test_counters = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
+        print("[TEST_TABLE] 🗑️ Historial de pruebas limpiado completamente")
 
     def _on_finish_test(self, e):
         """🔥 NUEVA FUNCIÓN: Finaliza la prueba y guarda resultados"""
@@ -889,7 +1194,7 @@ class TestTableModule:
         # 🔥 DETENER TIMER Y ACTUALIZAR BOTONES
         self.timer_module.stop_countdown()
         self.start_test_button.disabled = False
-        self.finish_test_button.disabled = True
+        self.finish_test_button.disabled = False
         
         # 🔥 MARCAR PRUEBA COMO NO EN PROGRESO
         self.test_in_progress = False
@@ -1226,20 +1531,22 @@ class TestTableModule:
         self.update_table()
 
     def initialize_table(self):
-        """Inicializa la tabla con los valores por defecto"""
+        """🔥 MEJORADA: Inicializa la tabla con los valores por defecto"""
         try:
-            print(f"[TEST_TABLE] 🔄 Inicializando tabla. Filas: {len(self.rows)}")
+            print(f"[TEST_TABLE] 🔄 Inicializando tabla. Filas actuales: {len(self.rows)}")
             if not self.rows:
                 self.rows.append(["", "", "", "", "", "", "", ""])
+                print(f"[TEST_TABLE] 📝 Fila inicial creada")
             self.update_table()
+            print(f"[TEST_TABLE] ✅ Tabla inicializada correctamente con {len(self.rows)} fila(s)")
         except Exception as e:
-            print(f"❌ Error inicializando tabla: {e}")
+            print(f"[TEST_TABLE] ❌ Error inicializando tabla: {e}")
 
     def build(self):
-        """🔥 CONSTRUYE LA TABLA COMPLETA CON BOTONES EN UNA SOLA FILA"""
+        """🔥 CONSTRUYE LA TABLA COMPLETA CON TODOS LOS BOTONES"""
         table_container = ft.Container(
             content=ft.Column(
-                controls=[self.table_with_margin],  # 🔥 USAR EL TABLE CON MARGEN
+                controls=[self.table_with_margin],
                 scroll=ft.ScrollMode.AUTO,
                 alignment=ft.MainAxisAlignment.START,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER
@@ -1253,17 +1560,44 @@ class TestTableModule:
             alignment=ft.alignment.top_center,
         )
 
+        # 🔥 CREAR BOTONES DE CONTROL
+        control_buttons = []
+        
+        # 🔥 BOTÓN AGREGAR FILA SIEMPRE DISPONIBLE
+        control_buttons.append(
+            ft.ElevatedButton("Agregar fila", icon=ft.Icons.ADD, on_click=self.add_row, width=140)
+        )
+        
+        # 🔥 TIMER
+        if self.timer_module:
+            control_buttons.append(self.timer_module.build())
+        else:
+            control_buttons.append(
+                ft.Container(
+                    ft.Text("⏱️ Timer: No disponible", color=ft.Colors.GREY),
+                    width=140,
+                    height=40,
+                    alignment=ft.alignment.center,
+                    border_radius=8,
+                    bgcolor=ft.Colors.GREY_100,
+                )
+            )
+        
+        # 🔥 BOTONES DE CONTROL DE PRUEBA
+        control_buttons.extend([
+            self.start_test_button,      # 🔥 INICIAR PRUEBA INDIVIDUAL
+            self.finish_test_button,     # 🔥 FINALIZAR PRUEBA INDIVIDUAL
+            ft.ElevatedButton("Ver Histórico", icon=ft.Icons.HISTORY, on_click=self.show_volume_history, width=140),
+            self.end_tests_button,       # 🔥 NUEVO: FINALIZAR TODAS LAS PRUEBAS
+        ])
+
         main_column = ft.Column([
-            
             # 🔥 FILA ÚNICA CON TODOS LOS BOTONES Y TIMER
-            ft.Row([
-                ft.ElevatedButton("Agregar fila", icon=ft.Icons.ADD, on_click=self.add_row, width=140),
-                self.timer_module.build(),  # 🔥 TIMER INTEGRADO
-                self.start_test_button,     # 🔥 BOTÓN INICIAR PRUEBA
-                self.finish_test_button,    # 🔥 BOTÓN FINALIZAR PRUEBA
-                ft.ElevatedButton("Ver Histórico", icon=ft.Icons.HISTORY, on_click=self.show_volume_history, width=140),
-            ], alignment="start", spacing=15),
-            
+            ft.Row(
+                control_buttons,
+                alignment="start", 
+                spacing=15
+            ),
             table_container,
         ], 
         expand=True,
@@ -1272,7 +1606,1018 @@ class TestTableModule:
         )
 
         return main_column
+    
+    def _on_end_tests(self, e):
+        """🔥 NUEVA FUNCIÓN: Finaliza toda la sesión de pruebas y guarda en BD"""
+        print("[TEST_TABLE] 🏁 Iniciando finalización de todas las pruebas...")
+        
+        # 🔥 VALIDAR QUE HAY PRUEBAS COMPLETADAS
+        if not self.completed_tests:
+            self._show_error_alert(
+                "❌ No hay pruebas para finalizar",
+                "No se han completado pruebas aún. Complete al menos una prueba antes de finalizar la sesión."
+            )
+            return
+        
+        # 🔥 MOSTRAR DIÁLOGO DE CONFIRMACIÓN
+        def confirm_end_tests(e):
+            if e.control.text == "Sí, finalizar":
+                # Cerrar diálogo de confirmación
+                confirm_dialog.open = False
+                if hasattr(confirm_dialog, 'page') and confirm_dialog.page is not None:
+                    confirm_dialog.page.update()
+                
+                # 🔥 EJECUTAR FINALIZACIÓN
+                self._execute_end_tests()
+            else:
+                # Cancelar
+                confirm_dialog.open = False
+                if hasattr(confirm_dialog, 'page') and confirm_dialog.page is not None:
+                    confirm_dialog.page.update()
+        
+        # 🔥 CALCULAR ESTADÍSTICAS PARA EL DIÁLOGO
+        total_tests = len(self.completed_tests)
+        total_meters = sum(len(test["results"]) for test in self.completed_tests)
+        total_passed = sum(sum(1 for r in test["results"] if r["is_passed"]) for test in self.completed_tests)
+        
+        summary_text = f"""📊 Resumen de la sesión:
 
+🧪 Grupos de pruebas realizados: {total_tests}
+📏 Total de medidores probados: {total_meters}
+✅ Medidores aprobados: {total_passed}
+❌ Medidores reprobados: {total_meters - total_passed}
+📈 Tasa de éxito general: {(total_passed/total_meters*100):.1f}%
+
+Esta acción guardará todos los datos en la base de datos y generará los informes finales.
+
+¿Está seguro de finalizar la sesión de pruebas?"""
+        
+        confirm_dialog = ft.AlertDialog(
+            title=ft.Text("🏁 Finalizar Sesión de Pruebas", size=18, weight="bold"),
+            content=ft.Container(
+                content=ft.Text(summary_text, size=14),
+                width=400,
+                height=300,
+            ),
+            actions=[
+                ft.TextButton("Cancelar", on_click=confirm_end_tests),
+                ft.ElevatedButton(
+                    "Sí, finalizar",
+                    on_click=confirm_end_tests,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.Colors.DEEP_ORANGE_600,
+                        color=ft.Colors.WHITE
+                    )
+                ),
+            ],
+        )
+        
+        if hasattr(self.data_table, 'page') and self.data_table.page is not None:
+            self.data_table.page.overlay.append(confirm_dialog)
+            confirm_dialog.open = True
+            self.data_table.page.update()
+
+    def _execute_end_tests(self):
+        """🔥 EJECUTA LA FINALIZACIÓN DE PRUEBAS"""
+        try:
+            print("[TEST_TABLE] 🔄 Ejecutando finalización de pruebas...")
+            
+            # 🔥 MOSTRAR DIÁLOGO DE PROGRESO
+            progress_ring = ft.ProgressRing(width=50, height=50, stroke_width=4)
+            progress_text = ft.Text("Finalizando sesión de pruebas...", size=16, text_align="center")
+            progress_details = ft.Text("Preparando datos...", size=12, text_align="center", color=ft.Colors.GREY_600)
+
+            progress_dialog = ft.AlertDialog(
+                modal=True,
+                title=ft.Text("🏁 Finalizando Sesión"),
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Container(
+                            progress_ring,
+                            alignment=ft.alignment.center,
+                            padding=ft.padding.all(20),
+                        ),
+                        progress_text,
+                        progress_details,
+                    ], 
+                    horizontal_alignment="center",
+                    spacing=15,
+                    ),
+                    width=300,
+                    height=200,
+                ),
+            )
+            
+            if hasattr(self.data_table, 'page') and self.data_table.page is not None:
+                self.data_table.page.overlay.append(progress_dialog)
+                progress_dialog.open = True
+                self.data_table.page.update()
+
+            # 🔥 SIMULAR PASOS DE FINALIZACIÓN
+            steps = [
+                ("Enviando comando de finalización al PLC...", 1.0),
+                ("Recopilando datos de la sesión...", 0.8),
+                ("Guardando en base de datos...", 1.5),
+                ("Generando informes...", 1.2),
+                ("Preparando vista de resultados...", 0.5),
+            ]
+            
+            for step_text, duration in steps:
+                progress_details.value = step_text
+                if hasattr(self.data_table, 'page') and self.data_table.page is not None:
+                    self.data_table.page.update()
+                time.sleep(duration)
+            
+            # 🔥 ENVIAR COMANDO MODBUS DE FINALIZACIÓN (PARA FUTURO USO)
+            self._send_end_tests_command()
+            
+            # 🔥 GUARDAR DATOS EN BASE DE DATOS
+            session_id = self._save_session_to_database()
+            
+            # 🔥 FINALIZAR PROGRESO
+            progress_text.value = "✅ Sesión finalizada exitosamente"
+            progress_details.value = "Redirigiendo a informes..."
+            progress_ring.visible = False
+            if hasattr(self.data_table, 'page') and self.data_table.page is not None:
+                self.data_table.page.update()
+            
+            time.sleep(1.5)
+            
+            # 🔥 CERRAR DIÁLOGO DE PROGRESO
+            progress_dialog.open = False
+            if hasattr(self.data_table, 'page') and self.data_table.page is not None:
+                self.data_table.page.update()
+            
+            # 🔥 IR A VISTA DE INFORMES
+            self._navigate_to_reports(session_id)
+            
+        except Exception as error:
+            print(f"[TEST_TABLE] ❌ Error finalizando pruebas: {error}")
+            
+            # 🔥 MOSTRAR ERROR
+            if hasattr(self.data_table, 'page') and self.data_table.page is not None:
+                progress_dialog.open = False
+                self.data_table.page.update()
+                
+                self._show_error_alert(
+                    "❌ Error al Finalizar",
+                    f"Ocurrió un error al finalizar la sesión:\n\n{str(error)}\n\nPor favor, contacte al administrador."
+                )
+
+    def _send_end_tests_command(self):
+        """🔥 ENVÍA COMANDO MODBUS PARA FINALIZAR PRUEBAS (PARA FUTURO USO)"""
+        try:
+            # 🔥 COMANDO FICTICIO PARA FUTURO USO - CAMBIAR SEGÚN ESPECIFICACIONES
+            end_tests_bit = 270  # 🔥 DEFINIR EL BIT CORRECTO CUANDO SE CONOZCA
+            
+            print(f"[TEST_TABLE] 📡 Enviando comando de finalización M{end_tests_bit}")
+            
+            if self.send_modbus_command:
+                self.send_modbus_command(end_tests_bit)
+                print(f"[TEST_TABLE] ✅ Comando de finalización enviado")
+            else:
+                print(f"[TEST_TABLE] ⚠️ Callback Modbus no disponible")
+                
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error enviando comando de finalización: {e}")
+
+    def _save_session_to_database(self):
+        """🔥 GUARDA TODA LA SESIÓN EN LA BASE DE DATOS"""
+        try:
+            print("[TEST_TABLE] 💾 Guardando sesión en base de datos...")
+            
+            # 🔥 POR AHORA RETORNAR ID SIMULADO HASTA QUE SE IMPLEMENTEN LOS CONTROLADORES
+            session_id = int(time.time())  # Usar timestamp como ID temporal
+            
+            print(f"[TEST_TABLE] ✅ Sesión guardada con ID: {session_id}")
+            return session_id
+            
+            # 🔥 TODO: IMPLEMENTAR GUARDADO REAL EN BD CUANDO ESTÉN LISTOS LOS CONTROLADORES
+            # from controllers.client_controller import get_client_by_name, add_client
+            # from controllers.technician_controller import get_technician_by_name, add_technician
+            # from controllers.meter_controller import add_meter_group, add_meter, add_test
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error guardando en base de datos: {e}")
+            # 🔥 RETORNAR ID TEMPORAL AUNQUE HAYA ERROR
+            return int(time.time())
+
+    def _get_session_data(self):
+        """🔥 OBTIENE DATOS COMPLETOS DE LA SESIÓN DESDE LA PÁGINA"""
+        try:
+            # 🔥 INTENTAR OBTENER DESDE PÁGINA (PRIORIDAD 1)
+            if hasattr(self, 'page') and self.page:
+                # Buscar datos en atributos de la página directamente
+                page_data = {
+                    "client_name": getattr(self.page, 'client_name', None),
+                    "technician_name": getattr(self.page, 'technician_name', None),
+                    "brand": getattr(self.page, 'brand', None),
+                    "model": getattr(self.page, 'model', None),
+                    "ratio": getattr(self.page, 'ratio', None),
+                    "nominal_flow": getattr(self.page, 'nominal_flow', None),
+                    "diameter": getattr(self.page, 'diameter', None),
+                    "type": getattr(self.page, 'meter_type', None),
+                    "batch": getattr(self.page, 'batch', None),
+                }
+                
+                # Si encontramos al menos algunos datos, usar estos
+                if any(value is not None for value in page_data.values()):
+                    print(f"[TEST_TABLE] 📊 Datos obtenidos desde atributos de página: {page_data}")
+                    # Rellenar valores faltantes con defaults
+                    return {
+                        "client_name": page_data["client_name"] or "Cliente Desconocido",
+                        "technician_name": page_data["technician_name"] or "Técnico Desconocido",
+                        "brand": page_data["brand"] or "Marca Desconocida",
+                        "model": page_data["model"] or "Modelo Desconocido",
+                        "ratio": int(page_data["ratio"]) if page_data["ratio"] else 100,
+                        "nominal_flow": float(page_data["nominal_flow"]) if page_data["nominal_flow"] else 1000.0,
+                        "diameter": float(page_data["diameter"]) if page_data["diameter"] else 20.0,
+                        "type": page_data["type"] or "Tipo Desconocido",
+                        "batch": page_data["batch"] or "nuevo",
+                    }
+            
+            # 🔥 INTENTAR OBTENER DESDE SESSION (PRIORIDAD 2)
+            if hasattr(self, 'page') and self.page and hasattr(self.page, 'session'):
+                try:
+                    session_data = {
+                        "client_name": self.page.session.get("client_name"),
+                        "technician_name": self.page.session.get("technician_name"),
+                        "brand": self.page.session.get("brand"),
+                        "model": self.page.session.get("model"),
+                        "ratio": self.page.session.get("ratio"),
+                        "nominal_flow": self.page.session.get("nominal_flow"),
+                        "diameter": self.page.session.get("diameter"),
+                        "type": self.page.session.get("meter_type"),
+                        "batch": self.page.session.get("batch"),
+                    }
+                    
+                    if any(value is not None for value in session_data.values()):
+                        print(f"[TEST_TABLE] 📊 Datos obtenidos desde session: {session_data}")
+                        return {
+                            "client_name": session_data["client_name"] or "Cliente Desconocido",
+                            "technician_name": session_data["technician_name"] or "Técnico Desconocido",
+                            "brand": session_data["brand"] or "Marca Desconocida",
+                            "model": session_data["model"] or "Modelo Desconocido",
+                            "ratio": int(session_data["ratio"]) if session_data["ratio"] else 100,
+                            "nominal_flow": float(session_data["nominal_flow"]) if session_data["nominal_flow"] else 1000.0,
+                            "diameter": float(session_data["diameter"]) if session_data["diameter"] else 20.0,
+                            "type": session_data["type"] or "Tipo Desconocido",
+                            "batch": session_data["batch"] or "nuevo",
+                        }
+                except Exception as e:
+                    print(f"[TEST_TABLE] ⚠️ Error accediendo a session: {e}")
+            
+            # 🔥 DATOS POR DEFECTO COMO ÚLTIMA OPCIÓN
+            print("[TEST_TABLE] ⚠️ Usando datos por defecto - no se encontraron datos de sesión")
+            return {
+                "client_name": "Cliente Desconocido",
+                "technician_name": "Técnico Desconocido", 
+                "brand": "Marca Desconocida",
+                "model": "Modelo Desconocido",
+                "ratio": 100,
+                "nominal_flow": 1000.0,
+                "diameter": 20.0,
+                "type": "Tipo Desconocido",
+                "batch": "nuevo",
+            }
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error obteniendo datos de sesión: {e}")
+            return {
+                "client_name": "Cliente Desconocido",
+                "technician_name": "Técnico Desconocido", 
+                "brand": "Marca Desconocida",
+                "model": "Modelo Desconocido",
+                "ratio": 100,
+                "nominal_flow": 1000.0,
+                "diameter": 20.0,
+                "type": "Tipo Desconocido",
+                "batch": "nuevo",
+            }
+
+    def force_q4_test_setup(self):
+        """🔥 FUNCIÓN DESHABILITADA: Ya no se ejecuta automáticamente"""
+        print("[TEST_TABLE] 🔇 force_q4_test_setup() deshabilitada - usar calibración manual")
+        return
+
+    def test_timer_functionality(self):
+        """🔥 FUNCIÓN DESHABILITADA: Ya no se ejecuta automáticamente"""
+        print("[TEST_TABLE] 🔇 test_timer_functionality() deshabilitada - timer funciona bajo demanda")
+        return True
+
+    def debug_force_test_type(self, test_type):
+        """🔥 FUNCIÓN DEBUG: Fuerza un tipo de prueba manualmente (solo para debug)"""
+        print(f"[TEST_TABLE] 🔧 DEBUG: Forzando manualmente tipo de prueba: {test_type}")
+        self.set_test_type_from_calibration(test_type)
+
+    def initialize_empty_table(self):
+        """🔥 NUEVA FUNCIÓN: Inicializa la tabla completamente vacía"""
+        try:
+            print(f"[TEST_TABLE] 🔄 Inicializando tabla vacía...")
+            if not self.rows:
+                # 🔥 CREAR FILA VACÍA SIN TIPO DE PRUEBA NI DATOS
+                self.rows.append(["", "", "", "", "", "", "", ""])
+                print(f"[TEST_TABLE] 📝 Fila vacía creada")
+            self.update_table()
+            print(f"[TEST_TABLE] ✅ Tabla vacía inicializada correctamente")
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error inicializando tabla vacía: {e}")
+
+    def set_test_type_from_calibration(self, test_type):
+        """🔥 MEJORADA: Establece el tipo de prueba SOLO cuando hay calibración real"""
+        print(f"[TEST_TABLE] 🎯 Estableciendo tipo de prueba por calibración: {test_type}")
+        
+        self.current_test_type = test_type
+        
+        # 🔥 CREAR AL MENOS UNA FILA SI NO HAY NINGUNA
+        if not self.rows:
+            self.rows.append(["", "", "", "", "", "", "", ""])
+            print(f"[TEST_TABLE] 📝 Creada fila inicial")
+        
+        # 🔥 RELLENAR TODAS LAS FILAS CON EL TIPO DE PRUEBA SELECCIONADO
+        for idx, row in enumerate(self.rows):
+            old_type = row[2]
+            row[2] = test_type  # Columna de tipo de prueba
+            print(f"[TEST_TABLE] 🔄 Fila {idx}: '{old_type}' → '{test_type}'")
+        
+        # 🔥 OBTENER TIEMPO DESDE CONFIGURACIÓN DE PRUEBAS
+        estimated_time_minutes = self.get_configured_time_for_test_type(test_type)
+        
+        # 🔥 CONFIGURAR TIEMPO EN EL TIMER PERO NO INICIARLO
+        if self.timer_module:
+            self.timer_module.set_time(estimated_time_minutes)
+            print(f"[TEST_TABLE] ⏰ Timer configurado con {estimated_time_minutes:.1f} minutos (sin iniciar)")
+        else:
+            print(f"[TEST_TABLE] ⚠️ Timer module no disponible")
+        
+        # 🔥 HABILITAR BOTÓN DE INICIO SOLO CUANDO HAY TIPO DE PRUEBA
+        self.start_test_button.disabled = False
+        print(f"[TEST_TABLE] 🔓 Botón 'Iniciar Prueba' habilitado")
+        
+        # 🔥 FORZAR ACTUALIZACIÓN COMPLETA DE LA TABLA
+        self.update_table()
+        
+        try:
+            self.start_test_button.update()
+        except:
+            pass
+        
+        print(f"[TEST_TABLE] ✅ Tipo de prueba establecido: {test_type}")
+        print(f"[TEST_TABLE] ⏱️ Tiempo configurado: {estimated_time_minutes:.1f} minutos")
+
+    def _on_finish_test(self, e):
+        """🔥 MEJORADA: Finaliza la prueba y resetea el sistema"""
+        if not self.current_test_type:
+            print("[TEST_TABLE] ⚠️ No hay tipo de prueba para finalizar")
+            return
+        
+        # 🔥 INCREMENTAR CONTADOR DE REPETIBILIDAD
+        self.test_counters[self.current_test_type] += 1
+        current_repetition = self.test_counters[self.current_test_type]
+        
+        # 🔥 CREAR NOMBRE DE PRUEBA CON REPETIBILIDAD
+        if current_repetition == 1:
+            test_name = f"Prueba {self.current_test_type}"
+        else:
+            test_name = f"Prueba {self.current_test_type}.{current_repetition}"
+        
+        print(f"[TEST_TABLE] 🏁 Finalizando: {test_name}")
+        
+        # 🔥 RECOPILAR DATOS DE TODAS LAS FILAS VÁLIDAS
+        test_results = []
+        serials_to_preserve = []
+        
+        for idx, row in enumerate(self.rows):
+            serial = row[1].strip()
+            test_type = row[2]
+            initial_reading = row[3].strip()
+            final_reading = row[4].strip()
+            pattern_volume = row[5]
+            error = row[6]
+            status = row[7]
+            
+            # 🔥 SOLO PROCESAR FILAS CON DATOS COMPLETOS
+            if serial and test_type and initial_reading and final_reading:
+                test_data = {
+                    "serial_number": serial,
+                    "test_type": test_type,
+                    "test_name": test_name,
+                    "repetition": current_repetition,
+                    "initial_reading": float(initial_reading),
+                    "final_reading": float(final_reading),
+                    "pattern_volume": float(pattern_volume) if pattern_volume else 0.0,
+                    "volume_difference": float(final_reading) - float(initial_reading),
+                    "error_percentage": float(error) if error else 0.0,
+                    "status": status,
+                    "is_passed": status == "PASA",
+                    "meter_status": self.meter_status,
+                    "completed_at": time.time(),
+                }
+                
+                test_results.append(test_data)
+                serials_to_preserve.append(serial)
+                
+        # 🔥 GUARDAR EN EL ARRAY DE PRUEBAS COMPLETADAS
+        if test_results:
+            # Crear grupo de prueba
+            test_group = {
+                "test_name": test_name,
+                "test_type": self.current_test_type,
+                "repetition": current_repetition,
+                "completed_at": time.time(),
+                "results": test_results,
+                "summary": {
+                    "total": len(test_results),
+                    "passed": sum(1 for r in test_results if r["is_passed"]),
+                    "failed": sum(1 for r in test_results if not r["is_passed"]),
+                    "success_rate": (sum(1 for r in test_results if r["is_passed"]) / len(test_results)) * 100
+                }
+            }
+            
+            self.completed_tests.append(test_group)
+            print(f"[TEST_TABLE] 💾 Guardados {len(test_results)} resultados para {test_name}")
+            print(f"[TEST_TABLE] 📊 Total grupos de pruebas: {len(self.completed_tests)}")
+        
+        # 🔥 LIMPIAR DATOS PERO PRESERVAR SERIALES
+        self.clear_data_preserve_serials(serials_to_preserve)
+        
+        # 🔥 DETENER TIMER Y ACTUALIZAR BOTONES
+        if self.timer_module:
+            self.timer_module.stop_countdown()
+        
+        self.start_test_button.disabled = False
+        self.finish_test_button.disabled = True
+        
+        # 🔥 MARCAR PRUEBA COMO NO EN PROGRESO
+        self.test_in_progress = False
+        self.active_test_type = None
+        
+        if hasattr(self, 'on_test_control'):
+            self.on_test_control("finish")
+            
+        try:
+            self.start_test_button.update()
+            self.finish_test_button.update()
+        except:
+            pass
+            
+        print(f"[TEST_TABLE] ✅ Prueba finalizada: {test_name}")
+        print(f"[TEST_TABLE] 🔄 Sistema listo para nueva prueba")
+
+    def _navigate_to_reports(self, session_id):
+        """🔥 NAVEGA A LA NUEVA VISTA DE RESUMEN CON DATOS COMPLETOS"""
+        try:
+            print(f"[TEST_TABLE] 🔄 Navegando a results_summary_view para sesión {session_id}")
+            
+            # 🔥 PREPARAR DATOS COMPLETOS PARA LA VISTA DE RESUMEN
+            session_data = self._get_session_data()
+            
+            summary_data = {
+                "session_id": session_id,
+                "completed_tests": self.completed_tests,
+                "session_data": session_data,  # 🔥 DATOS COMPLETOS DE BATCH REGISTRATION
+                "operation_mode": getattr(self, 'operation_mode', 'automatic'),
+                "total_groups": len(self.completed_tests),
+                "total_meters": sum(len(test["results"]) for test in self.completed_tests),
+                "total_passed": sum(sum(1 for r in test["results"] if r["is_passed"]) for test in self.completed_tests),
+                # 🔥 AGREGAR DATOS ADICIONALES PARA EL REPORTE
+                "test_summary": self._generate_test_summary(),
+                "meter_details": self._generate_meter_details(),
+                # 🔥 NUEVOS CAMPOS PARA MOSTRAR EN EL REPORTE
+                "batch_info": {
+                    "client": session_data["client_name"],
+                    "technician": session_data["technician_name"],
+                    "meter_brand": session_data["brand"],
+                    "meter_model": session_data["model"],
+                    "meter_type": session_data["type"],
+                    "ratio": session_data["ratio"],
+                    "nominal_flow": session_data["nominal_flow"],
+                    "diameter": session_data["diameter"],
+                    "batch_status": session_data["batch"],
+                },
+            }
+            
+            print(f"[TEST_TABLE] 📊 Datos de sesión preparados: {session_data}")
+            
+            # 🔥 VERIFICAR SI LA VISTA DE RESUMEN EXISTE
+            try:
+                from views.results_summary_view import get_results_summary_view
+                print("[TEST_TABLE] ✅ Módulo results_summary_view encontrado")
+            except ImportError as ie:
+                print(f"[TEST_TABLE] ❌ No se pudo importar results_summary_view: {ie}")
+                print("[TEST_TABLE] 🔄 Creando vista de resumen temporal...")
+                self._show_temporary_summary(summary_data)
+                return
+            
+            # 🔥 CAMBIAR A VISTA DE RESUMEN DE RESULTADOS
+            if hasattr(self.data_table, 'page') and self.data_table.page is not None:
+                page = self.data_table.page
+                page.controls.clear()
+                
+                results_view = get_results_summary_view(page, summary_data)
+                page.controls.append(results_view)
+                page.update()
+                
+                print("[TEST_TABLE] ✅ Navegación a results_summary_view exitosa")
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error navegando a results_summary_view: {e}")
+            import traceback
+            traceback.print_exc()
+            self._show_error_alert(
+                "❌ Error de Navegación",
+                f"No se pudo abrir la vista de resumen de resultados.\n\nSe guardaron los datos correctamente en la base de datos (Sesión ID: {session_id})\n\nError: {str(e)}"
+            )
+    
+
+    def _generate_test_summary(self):
+        """🔥 GENERA RESUMEN DETALLADO DE PRUEBAS"""
+        try:
+            summary = {}
+            
+            for test_group in self.completed_tests:
+                test_type = test_group["test_type"]
+                
+                if test_type not in summary:
+                    summary[test_type] = {
+                        "groups": 0,
+                        "total_meters": 0,
+                        "passed_meters": 0,
+                        "failed_meters": 0,
+                        "success_rate": 0.0,
+                        "avg_error": 0.0,
+                        "test_names": []
+                    }
+                
+                # Actualizar estadísticas
+                summary[test_type]["groups"] += 1
+                summary[test_type]["total_meters"] += len(test_group["results"])
+                summary[test_type]["test_names"].append(test_group["test_name"])
+                
+                # Calcular estadísticas por medidor
+                total_error = 0
+                for result in test_group["results"]:
+                    if result["is_passed"]:
+                        summary[test_type]["passed_meters"] += 1
+                    else:
+                        summary[test_type]["failed_meters"] += 1
+                    total_error += abs(result["error_percentage"])
+                
+                # Calcular promedios
+                if summary[test_type]["total_meters"] > 0:
+                    summary[test_type]["success_rate"] = (summary[test_type]["passed_meters"] / summary[test_type]["total_meters"]) * 100
+                    summary[test_type]["avg_error"] = total_error / summary[test_type]["total_meters"]
+            
+            print(f"[TEST_TABLE] 📊 Resumen de pruebas generado: {len(summary)} tipos de prueba")
+            return summary
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error generando resumen de pruebas: {e}")
+            return {}
+
+    def _generate_meter_details(self):
+        """🔥 GENERA DETALLES POR MEDIDOR INDIVIDUAL"""
+        try:
+            meters = {}
+            
+            for test_group in self.completed_tests:
+                for result in test_group["results"]:
+                    serial = result["serial_number"]
+                    
+                    if serial not in meters:
+                        meters[serial] = {
+                            "serial_number": serial,
+                            "tests": [],
+                            "total_tests": 0,
+                            "passed_tests": 0,
+                            "failed_tests": 0,
+                            "overall_passed": True,
+                            "avg_error": 0.0
+                        }
+                    
+                    # Agregar test al medidor
+                    meters[serial]["tests"].append({
+                        "test_name": test_group["test_name"],
+                        "test_type": test_group["test_type"],
+                        "repetition": test_group["repetition"],
+                        "initial_reading": result["initial_reading"],
+                        "final_reading": result["final_reading"],
+                        "error_percentage": result["error_percentage"],
+                        "is_passed": result["is_passed"],
+                        "status": result["status"]
+                    })
+                    
+                    # Actualizar estadísticas
+                    meters[serial]["total_tests"] += 1
+                    if result["is_passed"]:
+                        meters[serial]["passed_tests"] += 1
+                    else:
+                        meters[serial]["failed_tests"] += 1
+                        meters[serial]["overall_passed"] = False
+            
+            # Calcular error promedio para cada medidor
+            for serial, meter_data in meters.items():
+                if meter_data["total_tests"] > 0:
+                    total_error = sum(abs(test["error_percentage"]) for test in meter_data["tests"])
+                    meter_data["avg_error"] = total_error / meter_data["total_tests"]
+            
+            print(f"[TEST_TABLE] 📏 Detalles de medidores generados: {len(meters)} medidores")
+            return meters
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error generando detalles de medidores: {e}")
+            return {}
+
+    def _show_temporary_summary(self, summary_data):
+        """🔥 MUESTRA RESUMEN TEMPORAL SI NO EXISTE LA VISTA"""
+        try:
+            # 🔥 CREAR VISTA TEMPORAL SIMPLE
+            total_meters = summary_data.get("total_meters", 0)
+            total_passed = summary_data.get("total_passed", 0)
+            success_rate = (total_passed / total_meters * 100) if total_meters > 0 else 0
+            
+            # 🔥 CONTENIDO DEL RESUMEN
+            summary_content = ft.Column([
+                ft.Text("📋 Resumen de la Sesión Finalizada", size=24, weight="bold", color=ft.Colors.BLUE_900),
+                ft.Divider(),
+                
+                ft.Text(f"✅ Sesión guardada exitosamente en la base de datos", size=16, color=ft.Colors.GREEN, weight="bold"),
+                ft.Text(f"🆔 ID de Sesión: {summary_data['session_id']}", size=14, color=ft.Colors.GREY_700),
+                
+                ft.Divider(),
+                
+                ft.Text("📊 Estadísticas Generales:", size=18, weight="bold", color=ft.Colors.PURPLE_700),
+                ft.Text(f"🧪 Grupos de pruebas realizados: {summary_data['total_groups']}", size=14),
+                ft.Text(f"📏 Total de medidores probados: {total_meters}", size=14),
+                ft.Text(f"✅ Medidores aprobados: {total_passed}", size=14, color=ft.Colors.GREEN),
+                ft.Text(f"❌ Medidores reprobados: {total_meters - total_passed}", size=14, color=ft.Colors.RED),
+                ft.Text(f"📈 Tasa de éxito: {success_rate:.1f}%", size=16, weight="bold", 
+                       color=ft.Colors.GREEN if success_rate >= 80 else ft.Colors.ORANGE),
+                
+                ft.Divider(),
+                
+                ft.Text("🔍 Detalles de Grupos de Pruebas:", size=18, weight="bold", color=ft.Colors.PURPLE_700),
+                *[ft.Text(f"• {test['test_name']}: {len(test['results'])} medidores, "
+                         f"{test['summary']['success_rate']:.1f}% éxito", size=14) 
+                  for test in summary_data['completed_tests']],
+                
+                ft.Divider(),
+                
+                ft.Row([
+                    ft.ElevatedButton(
+                        "🏠 Volver al Inicio",
+                        on_click=lambda e: self._go_to_home(),
+                        bgcolor=ft.Colors.BLUE_600,
+                        color="white",
+                        width=200,
+                    ),
+                    ft.ElevatedButton(
+                        "🔄 Nueva Sesión",
+                        on_click=lambda e: self._start_new_session(),
+                        bgcolor=ft.Colors.GREEN_600,
+                        color="white",
+                        width=200,
+                    ),
+                ], alignment=ft.MainAxisAlignment.CENTER, spacing=20),
+                
+            ], spacing=15, scroll=ft.ScrollMode.AUTO)
+            
+            # 🔥 MOSTRAR EN LA PÁGINA
+            if hasattr(self.data_table, 'page') and self.data_table.page is not None:
+                page = self.data_table.page
+                page.controls.clear()
+                
+                main_container = ft.Container(
+                    content=summary_content,
+                    padding=40,
+                    alignment=ft.alignment.top_center,
+                    expand=True,
+                )
+                
+                page.controls.append(main_container)
+                page.update()
+                
+                print("[TEST_TABLE] ✅ Resumen temporal mostrado")
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error mostrando resumen temporal: {e}")
+
+
+    def _go_to_home(self):
+        """🔥 NAVEGA AL MENÚ PRINCIPAL"""
+        try:
+            print("[TEST_TABLE] 🏠 Navegando al menú principal...")
+            
+            # 🔥 INTENTAR IMPORTAR MAIN
+            try:
+                from main import create_main_menu
+                main_view = create_main_menu(self.data_table.page)
+            except ImportError:
+                try:
+                    from main import main_menu
+                    main_view = main_menu(self.data_table.page)
+                except ImportError:
+                    print("[TEST_TABLE] ❌ No se pudo importar función de menú principal")
+                    self._show_error_alert("Error", "No se pudo volver al menú principal")
+                    return
+            
+            # 🔥 CAMBIAR VISTA
+            if hasattr(self.data_table, 'page') and self.data_table.page is not None:
+                page = self.data_table.page
+                page.controls.clear()
+                page.controls.append(main_view)
+                page.update()
+                print("[TEST_TABLE] ✅ Navegación al inicio exitosa")
+                
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error navegando al inicio: {e}")
+
+
+    def test_timer_functionality(self):
+        """🔥 FUNCIÓN DE PRUEBA: Verifica que el timer funcione"""
+        if not self.timer_module:
+            print("[TEST_TABLE] ❌ Timer module no disponible para prueba")
+            return False
+        
+        print("[TEST_TABLE] 🧪 PRUEBA: Configurando timer de 2 minutos...")
+        
+        try:
+            # Configurar 2 minutos
+            self.timer_module.set_time(2.0)
+            print("[TEST_TABLE] ✅ Timer configurado exitosamente")
+            
+            # Probar inicio de cuenta regresiva
+            self.timer_module.start_countdown()
+            print("[TEST_TABLE] ✅ Cuenta regresiva iniciada exitosamente")
+            
+            return True
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error en prueba de timer: {e}")
+            return False
+        
+    def _start_new_session(self):
+        """🔥 INICIA NUEVA SESIÓN DE PRUEBAS"""
+        try:
+            print("[TEST_TABLE] 🔄 Iniciando nueva sesión...")
+            
+            from views.batch_registration_view import get_batch_registration_view
+            
+            if hasattr(self.data_table, 'page') and self.data_table.page is not None:
+                page = self.data_table.page
+                page.controls.clear()
+                
+                # 🔥 CREAR NUEVA VISTA SIN PARÁMETROS ADICIONALES
+                new_view = get_batch_registration_view(page, None)
+                page.controls.append(new_view)
+                page.update()
+                
+                print("[TEST_TABLE] ✅ Nueva sesión iniciada")
+                
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error iniciando nueva sesión: {e}")
+
+    def _normalize_batch_value(self, batch_value):
+        """🔥 NORMALIZA EL VALOR DE BATCH PARA QUE COINCIDA CON TU ESQUEMA"""
+        if not batch_value:
+            return "new"
+        
+        batch_lower = str(batch_value).lower().strip()
+        
+        # Mapear valores en español/inglés
+        if batch_lower in ["nuevo", "new"]:
+            return "new"
+        elif batch_lower in ["usado", "used"]:
+            return "used"
+        else:
+            print(f"[TEST_TABLE] ⚠️ Valor de batch desconocido: {batch_value}, usando 'new'")
+            return "new"
+
+
+    def _get_session_data(self):
+        """🔥 OBTIENE DATOS COMPLETOS DE LA SESIÓN DESDE LA PÁGINA"""
+        try:
+            # 🔥 INTENTAR OBTENER DESDE PÁGINA (PRIORIDAD 1)
+            if hasattr(self, 'page') and self.page:
+                # Buscar datos en atributos de la página directamente
+                page_data = {
+                    "client_name": getattr(self.page, 'client_name', None),
+                    "technician_name": getattr(self.page, 'technician_name', None),
+                    "brand": getattr(self.page, 'brand', None),
+                    "model": getattr(self.page, 'model', None),
+                    "ratio": getattr(self.page, 'ratio', None),
+                    "nominal_flow": getattr(self.page, 'nominal_flow', None),
+                    "diameter": getattr(self.page, 'diameter', None),
+                    "type": getattr(self.page, 'meter_type', None),
+                    "batch": getattr(self.page, 'batch', None),
+                }
+                
+                # Si encontramos al menos algunos datos, usar estos
+                if any(value is not None for value in page_data.values()):
+                    print(f"[TEST_TABLE] 📊 Datos obtenidos desde atributos de página: {page_data}")
+                    # Rellenar valores faltantes con defaults
+                    return {
+                        "client_name": page_data["client_name"] or "Cliente Desconocido",
+                        "technician_name": page_data["technician_name"] or "Técnico Desconocido",
+                        "brand": page_data["brand"] or "Marca Desconocida",
+                        "model": page_data["model"] or "Modelo Desconocido",
+                        "ratio": int(page_data["ratio"]) if page_data["ratio"] else 100,
+                        "nominal_flow": float(page_data["nominal_flow"]) if page_data["nominal_flow"] else 1000.0,
+                        "diameter": float(page_data["diameter"]) if page_data["diameter"] else 20.0,
+                        "type": page_data["type"] or "Tipo Desconocido",
+                        "batch": page_data["batch"] or "nuevo",
+                    }
+            
+            # 🔥 INTENTAR OBTENER DESDE SESSION (PRIORIDAD 2)
+            if hasattr(self, 'page') and self.page and hasattr(self.page, 'session'):
+                try:
+                    session_data = {
+                        "client_name": self.page.session.get("client_name"),
+                        "technician_name": self.page.session.get("technician_name"),
+                        "brand": self.page.session.get("brand"),
+                        "model": self.page.session.get("model"),
+                        "ratio": self.page.session.get("ratio"),
+                        "nominal_flow": self.page.session.get("nominal_flow"),
+                        "diameter": self.page.session.get("diameter"),
+                        "type": self.page.session.get("meter_type"),
+                        "batch": self.page.session.get("batch"),
+                    }
+                    
+                    if any(value is not None for value in session_data.values()):
+                        print(f"[TEST_TABLE] 📊 Datos obtenidos desde session: {session_data}")
+                        return {
+                            "client_name": session_data["client_name"] or "Cliente Desconocido",
+                            "technician_name": session_data["technician_name"] or "Técnico Desconocido",
+                            "brand": session_data["brand"] or "Marca Desconocida",
+                            "model": session_data["model"] or "Modelo Desconocido",
+                            "ratio": int(session_data["ratio"]) if session_data["ratio"] else 100,
+                            "nominal_flow": float(session_data["nominal_flow"]) if session_data["nominal_flow"] else 1000.0,
+                            "diameter": float(session_data["diameter"]) if session_data["diameter"] else 20.0,
+                            "type": session_data["type"] or "Tipo Desconocido",
+                            "batch": session_data["batch"] or "nuevo",
+                        }
+                except Exception as e:
+                    print(f"[TEST_TABLE] ⚠️ Error accediendo a session: {e}")
+            
+            # 🔥 DATOS POR DEFECTO COMO ÚLTIMA OPCIÓN
+            print("[TEST_TABLE] ⚠️ Usando datos por defecto - no se encontraron datos de sesión")
+            return {
+                "client_name": "Cliente Desconocido",
+                "technician_name": "Técnico Desconocido", 
+                "brand": "Marca Desconocida",
+                "model": "Modelo Desconocido",
+                "ratio": 100,
+                "nominal_flow": 1000.0,
+                "diameter": 20.0,
+                "type": "Tipo Desconocido",
+                "batch": "nuevo",
+            }
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error obteniendo datos de sesión: {e}")
+            return {
+                "client_name": "Cliente Desconocido",
+                "technician_name": "Técnico Desconocido", 
+                "brand": "Marca Desconocida",
+                "model": "Modelo Desconocido",
+                "ratio": 100,
+                "nominal_flow": 1000.0,
+                "diameter": 20.0,
+                "type": "Tipo Desconocido",
+                "batch": "nuevo",
+            }
+
+    def _save_session_to_database(self):
+        """🔥 GUARDA TODA LA SESIÓN EN LA BASE DE DATOS USANDO TU SERVICIO DB"""
+        try:
+            print("[TEST_TABLE] 💾 Guardando sesión en base de datos PostgreSQL...")
+            
+            # 🔥 IMPORTAR TU SERVICIO DE BD
+            from services.db_service import (
+                insert_client, fetch_all_clients,
+                insert_technician, fetch_all_technicians,
+                insert_meter_group, save_meter_if_not_exists,
+                save_test_for_meter, get_existing_test_count
+            )
+            
+            # 🔥 OBTENER DATOS DE LA SESIÓN
+            session_data = self._get_session_data()
+            
+            # 🔥 PASO 1: OBTENER/CREAR CLIENTE
+            client_name = session_data.get("client_name", "Cliente Desconocido")
+            print(f"[TEST_TABLE] 👤 Procesando cliente: {client_name}")
+            
+            # Buscar cliente existente por nombre
+            existing_clients = fetch_all_clients()
+            client_id = None
+            for client in existing_clients:
+                if client.get("name", "").lower().strip() == client_name.lower().strip():
+                    client_id = client["id"]
+                    break
+            
+            # Crear cliente si no existe
+            if not client_id:
+                client_id = insert_client(client_name)
+                print(f"[TEST_TABLE] ✅ Cliente creado: {client_name} (ID: {client_id})")
+            else:
+                print(f"[TEST_TABLE] ✅ Cliente existente: {client_name} (ID: {client_id})")
+            
+            # 🔥 PASO 2: OBTENER/CREAR TÉCNICO
+            technician_name = session_data.get("technician_name", "Técnico Desconocido")
+            print(f"[TEST_TABLE] 🔧 Procesando técnico: {technician_name}")
+            
+            # Buscar técnico existente por nombre
+            existing_technicians = fetch_all_technicians()
+            technician_id = None
+            for tech in existing_technicians:
+                if tech.get("name", "").lower().strip() == technician_name.lower().strip():
+                    technician_id = tech["id"]
+                    break
+            
+            # Crear técnico si no existe
+            if not technician_id:
+                technician_id = insert_technician(technician_name)
+                print(f"[TEST_TABLE] ✅ Técnico creado: {technician_name} (ID: {technician_id})")
+            else:
+                print(f"[TEST_TABLE] ✅ Técnico existente: {technician_name} (ID: {technician_id})")
+            
+            # 🔥 PASO 3: CREAR GRUPO DE MEDIDORES (SESIÓN) - USANDO TU ESQUEMA
+            meter_group_data = {
+                "brand": session_data.get("brand", "Marca Desconocida")[:50],  # Limitar a 50 chars
+                "model": session_data.get("model", "Modelo Desconocido")[:50],
+                "ratio": int(session_data.get("ratio", 100)),
+                "nominal_flow": float(session_data.get("nominal_flow", 1000)),
+                "diameter": float(session_data.get("diameter", 20)),
+                "type": session_data.get("type", "Tipo Desconocido")[:50],
+                "batch": self._normalize_batch_value(session_data.get("batch", "nuevo")),  # 🔥 NORMALIZAR
+            }
+            
+            meter_group_id = insert_meter_group(meter_group_data, client_id, technician_id)
+            print(f"[TEST_TABLE] ✅ Grupo de medidores creado (ID: {meter_group_id})")
+            
+            # 🔥 PASO 4: GUARDAR MEDIDORES Y PRUEBAS
+            saved_tests_count = 0
+            saved_meters_count = 0
+            processed_serials = set()
+            
+            for test_group in self.completed_tests:
+                print(f"[TEST_TABLE] 📝 Procesando grupo: {test_group['test_name']}")
+                
+                for result in test_group["results"]:
+                    try:
+                        serial_number = str(result["serial_number"]).strip()[:100]  # Limitar a 100 chars
+                        
+                        # 🔥 CREAR/OBTENER MEDIDOR (USANDO TU ESQUEMA)
+                        meter_id = save_meter_if_not_exists(serial_number, meter_group_id)
+                        if meter_id and serial_number not in processed_serials:
+                            saved_meters_count += 1
+                            processed_serials.add(serial_number)
+                            print(f"[TEST_TABLE] 📏 Medidor procesado: {serial_number} (ID: {meter_id})")
+                        
+                        # 🔥 DETERMINAR NÚMERO DE PRUEBA AUTOMÁTICAMENTE
+                        existing_count = get_existing_test_count(serial_number, test_group["test_type"])
+                        test_number = existing_count + 1
+                        
+                        # 🔥 PREPARAR DATOS DE LA PRUEBA (USANDO TU ESQUEMA EXACTO)
+                        test_data = {
+                            "test_type": str(test_group["test_type"])[:10],  # Limitar a 10 chars
+                            "test_number": int(test_number),
+                            "initial_reading": float(result["initial_reading"]),
+                            "final_reading": float(result["final_reading"]),
+                            "reference_value": float(result.get("pattern_volume", 100.0)),  # Default 100 como en tu esquema
+                            "error": float(result["error_percentage"]),
+                            "passed": bool(result["is_passed"])
+                        }
+                        
+                        # 🔥 GUARDAR PRUEBA EN BD
+                        save_test_for_meter(meter_id, test_data)
+                        saved_tests_count += 1
+                        
+                        print(f"[TEST_TABLE] ✅ Prueba guardada: {serial_number} - {test_group['test_type']} #{test_number}")
+                        
+                    except Exception as e:
+                        print(f"[TEST_TABLE] ❌ Error guardando resultado individual: {e}")
+                        print(f"[TEST_TABLE] 📋 Datos del resultado: {result}")
+                        import traceback
+                        traceback.print_exc()
+            
+            print(f"[TEST_TABLE] ✅ Sesión guardada completamente en PostgreSQL")
+            print(f"[TEST_TABLE] 📊 Estadísticas finales:")
+            print(f"  • Grupo ID: {meter_group_id}")
+            print(f"  • Medidores únicos procesados: {saved_meters_count}")
+            print(f"  • Pruebas guardadas: {saved_tests_count}")
+            print(f"  • Cliente: {client_name} (ID: {client_id})")
+            print(f"  • Técnico: {technician_name} (ID: {technician_id})")
+            
+            return meter_group_id  # 🔥 RETORNAR ID DE LA SESIÓN
+            
+        except Exception as e:
+            print(f"[TEST_TABLE] ❌ Error crítico guardando en PostgreSQL: {e}")
+            import traceback
+            traceback.print_exc()
+            raise Exception(f"Error guardando en base de datos: {str(e)}")
+    
+    
     # 🔥 FUNCIONES PÚBLICAS PARA COMPATIBILIDAD
     def actualizar_valores_instantaneos(self, q1, q2, q3, q4):
         """Wrapper para compatibilidad"""
