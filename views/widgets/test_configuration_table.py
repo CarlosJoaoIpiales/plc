@@ -192,6 +192,90 @@ def test_configuration_table(q1=0, q2=0, q3=0, q4=0):
         
         return configurations
 
+
+    def on_volume_blur(e, row_idx):
+        """Maneja cuando el campo de volumen pierde el foco - ACTUALIZA SOLO TIEMPO"""
+        if row_idx < len(rows):
+            try:
+                # 🔥 MANEJAR CAMPO VACÍO
+                volume_str = e.control.value.strip()
+                if not volume_str:
+                    rows[row_idx][5] = ""
+                    rows[row_idx][6] = "0:00"
+                    # 🔥 ACTUALIZAR SOLO EL TEXTO DE TIEMPO SIN REFRESCAR TABLA
+                    update_time_for_row(row_idx, "0:00")
+                    print(f"[TEST_CONFIG] 🔄 Volumen vacío en fila {row_idx}")
+                    return
+                
+                # 🔥 CONVERTIR A ENTERO
+                volume = int(volume_str)
+                if volume <= 0:
+                    print(f"[TEST_CONFIG] ⚠️ Volumen debe ser mayor a 0: {volume}")
+                    e.control.error_text = "Debe ser mayor a 0"
+                    if hasattr(e.control, 'update'):
+                        e.control.update()
+                    return
+                
+                # 🔥 LIMPIAR ERROR
+                e.control.error_text = None
+                rows[row_idx][5] = str(volume)
+                
+                # 🔥 RECALCULAR EL TIEMPO BASADO EN EL NUEVO VOLUMEN
+                test_type = rows[row_idx][1]
+                if test_type != "Escoja una opción" and volume > 0:
+                    time_formatted, time_decimal = calculate_time_from_volume(test_type, volume)
+                    rows[row_idx][6] = time_formatted
+                    # 🔥 ACTUALIZAR SOLO EL TIEMPO SIN REFRESCAR TABLA COMPLETA
+                    update_time_for_row(row_idx, time_formatted)
+                    print(f"[TEST_CONFIG] ✅ Volumen confirmado en fila {row_idx}: {volume}L -> Tiempo: {time_formatted}")
+                else:
+                    rows[row_idx][6] = "0:00"
+                    update_time_for_row(row_idx, "0:00")
+                    print(f"[TEST_CONFIG] ⚠️ No se puede calcular tiempo: test_type='{test_type}', volume={volume}")
+                
+                # 🔥 ACTUALIZAR SOLO EL CONTROL ACTUAL
+                if hasattr(e.control, 'update'):
+                    e.control.update()
+                
+            except ValueError:
+                print(f"[TEST_CONFIG] ❌ Valor de volumen inválido: {e.control.value}")
+                e.control.error_text = "Solo números enteros"
+                if hasattr(e.control, 'update'):
+                    e.control.update()
+
+    def update_time_for_row(row_idx, new_time):
+        """🔥 NUEVA FUNCIÓN: Actualiza solo el tiempo de una fila específica"""
+        try:
+            if row_idx < len(data_table.rows):
+                # 🔥 BUSCAR LA CELDA DE TIEMPO (índice 6) Y ACTUALIZAR SU TEXTO
+                time_cell = data_table.rows[row_idx].cells[6]  # Columna de tiempo
+                if hasattr(time_cell, 'content') and hasattr(time_cell.content, 'content'):
+                    # 🔥 ACTUALIZAR EL TEXTO DENTRO DEL CONTAINER
+                    time_text = time_cell.content.content
+                    if hasattr(time_text, 'value'):
+                        time_text.value = new_time if new_time and new_time != "0:00" else "--:--"
+                        time_text.color = ft.Colors.ORANGE_700 if new_time != "0:00" else ft.Colors.GREY_500
+                        
+                        # 🔥 ACTUALIZAR SOLO ESTE CONTROL
+                        if hasattr(time_text, 'update'):
+                            time_text.update()
+                        
+                        print(f"[TEST_CONFIG] ⏱️ Tiempo actualizado para fila {row_idx}: {new_time}")
+                        return True
+            
+            print(f"[TEST_CONFIG] ⚠️ No se pudo actualizar tiempo para fila {row_idx}")
+            return False
+            
+        except Exception as e:
+            print(f"[TEST_CONFIG] ❌ Error actualizando tiempo para fila {row_idx}: {e}")
+            return False
+
+    def on_volume_submit(e, row_idx):
+        """Maneja el envío del volumen al presionar Enter - IGUAL QUE BLUR"""
+        # 🔥 LLAMAR A LA MISMA FUNCIÓN QUE BLUR PARA CONSISTENCIA
+        on_volume_blur(e, row_idx)
+
+
     def update_table():
         """Actualiza la tabla con los datos actuales"""
         try:
@@ -302,12 +386,13 @@ def test_configuration_table(q1=0, q2=0, q3=0, q4=0):
                             )
                         ),
                         
-                        # 🔥 VOLUMEN
+                        # 🔥 VOLUMEN - AGREGADO on_blur
                         ft.DataCell(
                             ft.Container(
                                 ft.TextField(
                                     value=row[5] if row[5] and row[5] != "0" else "",
                                     on_submit=lambda e, row_idx=idx: on_volume_submit(e, row_idx),
+                                    on_blur=lambda e, row_idx=idx: on_volume_blur(e, row_idx),  # 🔥 NUEVO: AL PERDER FOCO
                                     keyboard_type=ft.KeyboardType.NUMBER,
                                     input_filter=ft.InputFilter(allow=True, regex_string=r"^[1-9]\d*$"),
                                     dense=True,
@@ -326,13 +411,13 @@ def test_configuration_table(q1=0, q2=0, q3=0, q4=0):
                             )
                         ),
                         
-                        # 🔥 TIEMPO
+                        # 🔥 TIEMPO - CON REFERENCIAS PARA ACTUALIZACIÓN INDIVIDUAL
                         ft.DataCell(
                             ft.Container(
                                 ft.Text(
                                     row[6] if row[6] and row[6] != "0:00" else "--:--",
                                     weight="bold",
-                                    color=ft.Colors.ORANGE_700,
+                                    color=ft.Colors.ORANGE_700 if row[6] != "0:00" else ft.Colors.GREY_500,
                                     text_align=ft.TextAlign.CENTER,
                                     size=15,
                                 ),
@@ -390,21 +475,71 @@ def test_configuration_table(q1=0, q2=0, q3=0, q4=0):
             print(f"[TEST_CONFIG] ⚠️ No se puede eliminar configuración {idx}")
 
     def on_test_type_change(e, row_idx):
-        """Maneja cambios en el tipo de prueba"""
+        """Maneja cambios en el tipo de prueba - ACTUALIZACIÓN INTELIGENTE"""
         if row_idx < len(rows):
-            rows[row_idx][1] = e.control.value
-            print(f"[TEST_CONFIG] 🔄 Tipo de prueba cambiado en fila {row_idx}: {e.control.value}")
+            old_test_type = rows[row_idx][1]
+            new_test_type = e.control.value
+            rows[row_idx][1] = new_test_type
+            
+            print(f"[TEST_CONFIG] 🔄 Tipo de prueba cambiado en fila {row_idx}: {old_test_type} -> {new_test_type}")
             
             # 🔥 RECALCULAR TIEMPO SI YA HAY VOLUMEN
             if rows[row_idx][5] and int(rows[row_idx][5]) > 0:
                 volume = int(rows[row_idx][5])
-                time_formatted, time_decimal = calculate_time_from_volume(e.control.value, volume)
+                time_formatted, time_decimal = calculate_time_from_volume(new_test_type, volume)
                 rows[row_idx][6] = time_formatted
                 
-            update_table()
+                # 🔥 ACTUALIZAR SOLO EL TIEMPO SIN REFRESCAR TABLA
+                update_time_for_row(row_idx, time_formatted)
+                print(f"[TEST_CONFIG] 🧮 Cálculo tiempo: {volume}L / {new_test_type} = {time_formatted}")
+            
+            # 🔥 SOLO ACTUALIZAR CAUDALES DE ESTA FILA
+            if new_test_type != "Escoja una opción":
+                current_volume = int(rows[row_idx][5]) if rows[row_idx][5] and rows[row_idx][5] != "0" else None
+                values = calculate_flow_values(new_test_type, int(rows[row_idx][2]), current_volume)
+                rows[row_idx][3] = str(values["max_flow"])
+                rows[row_idx][4] = str(values["min_flow"])
+                
+                # 🔥 ACTUALIZAR SOLO LAS CELDAS DE CAUDAL DE ESTA FILA
+                update_flow_cells_for_row(row_idx, values["max_flow"], values["min_flow"])
+            else:
+                rows[row_idx][3] = "0"
+                rows[row_idx][4] = "0"
+                update_flow_cells_for_row(row_idx, 0, 0)
+
+    def update_flow_cells_for_row(row_idx, max_flow, min_flow):
+        """🔥 NUEVA FUNCIÓN: Actualiza solo las celdas de caudal de una fila específica"""
+        try:
+            if row_idx < len(data_table.rows):
+                # 🔥 CAUDAL MÁXIMO (columna 3)
+                max_flow_cell = data_table.rows[row_idx].cells[3]
+                if hasattr(max_flow_cell, 'content') and hasattr(max_flow_cell.content, 'content'):
+                    max_text = max_flow_cell.content.content
+                    if hasattr(max_text, 'value'):
+                        max_text.value = str(max_flow)
+                        if hasattr(max_text, 'update'):
+                            max_text.update()
+                
+                # 🔥 CAUDAL MÍNIMO (columna 4)
+                min_flow_cell = data_table.rows[row_idx].cells[4]
+                if hasattr(min_flow_cell, 'content') and hasattr(min_flow_cell.content, 'content'):
+                    min_text = min_flow_cell.content.content
+                    if hasattr(min_text, 'value'):
+                        min_text.value = str(min_flow)
+                        if hasattr(min_text, 'update'):
+                            min_text.update()
+                
+                print(f"[TEST_CONFIG] 🔄 Caudales actualizados para fila {row_idx}: Max={max_flow}, Min={min_flow}")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"[TEST_CONFIG] ❌ Error actualizando caudales para fila {row_idx}: {e}")
+            return False
 
     def on_repetitions_blur(e, row_idx):
-        """Maneja cuando el campo de repeticiones pierde el foco"""
+        """Maneja cuando el campo de repeticiones pierde el foco - SIN REFRESCAR TABLA"""
         if row_idx < len(rows):
             try:
                 # 🔥 SI ESTÁ VACÍO, PONER VALOR POR DEFECTO
@@ -431,9 +566,7 @@ def test_configuration_table(q1=0, q2=0, q3=0, q4=0):
                     rows[row_idx][2] = str(repetitions)
                     print(f"[TEST_CONFIG] ✅ Repeticiones validadas en fila {row_idx}: {repetitions}")
                 
-                # 🔥 ACTUALIZAR SOLO AL PERDER EL FOCO
-                update_table()
-                
+                # 🔥 NO ACTUALIZAR TABLA COMPLETA - SOLO EL CONTROL ACTUAL
                 if hasattr(e.control, 'update'):
                     e.control.update()
                 
