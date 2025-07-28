@@ -10,13 +10,9 @@ class TestTableModule:
         self.on_data_changed = on_data_changed
         self.current_test = None
         self.meter_status = "nuevo"  # 🔥 SE OBTIENE DE BATCH REGISTRATION
-
-        self.test_configurations_direct = []
         
         # 🔥 ESTRUCTURA DE FILAS: [#, Serial, Tipo, Inicial, Final, Volumen_Patron, Error, Estado]
         self.rows = []
-        self.completed_rows = set()  # Índices de filas que ya tienen prueba completada
-        self.frozen_values = {}
         
         # 🔥 NUEVO: TIPO DE PRUEBA ACTUAL SELECCIONADO POR CALIBRACIÓN
         self.current_test_type = None
@@ -35,14 +31,6 @@ class TestTableModule:
         # self.timer_module = create_timer_module(self._on_timer_finished)
         self.timer_module = None  # 🔥 SE ESTABLECE EXTERNAMENTE
         
-        # 🔥 MAPEO DE TIPOS DE PRUEBA A VALORES INSTANTÁNEOS
-        self.test_to_instant_mapping = {
-            "Q1": "vol_q1",  # Q1 usa volumen Q1
-            "Q2": "vol_q2",  # Q2 usa volumen Q2  
-            "Q3": "vol_q3",  # Q3 usa volumen Q3
-            "Q4": "vol_q4"   # Q4 usa volumen Q4
-        }
-        
         # 🔥 MAPEO DE MENSAJES DE CALIBRACIÓN A TIPOS DE PRUEBA
         self.calibration_messages = {
             "✅ Fin de calibración Q1": "Q1",
@@ -60,13 +48,6 @@ class TestTableModule:
             "Q3": 0.1,  # 🔥 CAMBIADO DE 3000.0 A 0.1
             "Q4": 0.1,  # 🔥 CAMBIADO DE 4000.0 A 0.1
         }
-
-        # 🔥 ESTADO DE PRUEBAS ACTIVAS (PARA RESETEAR CUANDO INICIA NUEVA PRUEBA)
-        self.active_test_type = None
-        self.test_in_progress = False
-
-        # 🔥 CONTADOR PARA DEBUG
-        self.add_row_counter = 0
 
         # 🔥 NUEVA VARIABLE: REFERENCIAS A LAS CELDAS DE VOLUMEN PATRÓN
         self.pattern_volume_cells = {}  # {row_idx: Text_widget}
@@ -404,12 +385,6 @@ class TestTableModule:
         """🔥 NUEVA FUNCIÓN: Establece referencia a la página para acceder a sesión"""
         self.page = page
         print("[TEST_TABLE] 🔗 Referencia a página establecida para acceso a configuraciones")
-
-
-    def debug_set_test_type(self, test_type):
-        """🔥 FUNCIÓN DEBUG: Fuerza el establecimiento de un tipo de prueba"""
-        print(f"[TEST_TABLE] 🔧 DEBUG: Forzando tipo de prueba a {test_type}")
-        self.set_test_type_from_calibration(test_type)
 
     def set_test_type_from_button(self, test_type):
         """🔥 FUNCIÓN EXISTENTE: Establece el tipo de prueba desde el botón presionado"""
@@ -1894,17 +1869,6 @@ Esta acción guardará todos los datos en la base de datos y generará los infor
                 "batch": "nuevo",
             }
 
-
-    def test_timer_functionality(self):
-        """🔥 FUNCIÓN DESHABILITADA: Ya no se ejecuta automáticamente"""
-        print("[TEST_TABLE] 🔇 test_timer_functionality() deshabilitada - timer funciona bajo demanda")
-        return True
-
-    def debug_force_test_type(self, test_type):
-        """🔥 FUNCIÓN DEBUG: Fuerza un tipo de prueba manualmente (solo para debug)"""
-        print(f"[TEST_TABLE] 🔧 DEBUG: Forzando manualmente tipo de prueba: {test_type}")
-        self.set_test_type_from_calibration(test_type)
-
     def initialize_empty_table(self):
         """🔥 NUEVA FUNCIÓN: Inicializa la tabla completamente vacía"""
         try:
@@ -1959,105 +1923,6 @@ Esta acción guardará todos los datos en la base de datos y generará los infor
         
         print(f"[TEST_TABLE] ✅ Tipo de prueba establecido: {test_type}")
         print(f"[TEST_TABLE] ⏱️ Tiempo configurado: {estimated_time_minutes:.1f} minutos")
-
-    def _on_finish_test(self, e):
-        """🔥 MEJORADA: Finaliza la prueba y resetea el sistema"""
-        if not self.current_test_type:
-            print("[TEST_TABLE] ⚠️ No hay tipo de prueba para finalizar")
-            return
-        
-        # 🔥 INCREMENTAR CONTADOR DE REPETIBILIDAD
-        self.test_counters[self.current_test_type] += 1
-        current_repetition = self.test_counters[self.current_test_type]
-        
-        # 🔥 CREAR NOMBRE DE PRUEBA CON REPETIBILIDAD
-        if current_repetition == 1:
-            test_name = f"Prueba {self.current_test_type}"
-        else:
-            test_name = f"Prueba {self.current_test_type}.{current_repetition}"
-        
-        print(f"[TEST_TABLE] 🏁 Finalizando: {test_name}")
-        
-        # 🔥 RECOPILAR DATOS DE TODAS LAS FILAS VÁLIDAS
-        test_results = []
-        serials_to_preserve = []
-        
-        for idx, row in enumerate(self.rows):
-            serial = row[1].strip()
-            test_type = row[2]
-            initial_reading = row[3].strip()
-            final_reading = row[4].strip()
-            pattern_volume = row[5]
-            error = row[6]
-            status = row[7]
-            
-            # 🔥 SOLO PROCESAR FILAS CON DATOS COMPLETOS
-            if serial and test_type and initial_reading and final_reading:
-                test_data = {
-                    "serial_number": serial,
-                    "test_type": test_type,
-                    "test_name": test_name,
-                    "repetition": current_repetition,
-                    "initial_reading": float(initial_reading),
-                    "final_reading": float(final_reading),
-                    "pattern_volume": float(pattern_volume) if pattern_volume else 0.0,
-                    "volume_difference": float(final_reading) - float(initial_reading),
-                    "error_percentage": float(error) if error else 0.0,
-                    "status": status,
-                    "is_passed": status == "PASA",
-                    "meter_status": self.meter_status,
-                    "completed_at": time.time(),
-                }
-                
-                test_results.append(test_data)
-                serials_to_preserve.append(serial)
-                
-        # 🔥 GUARDAR EN EL ARRAY DE PRUEBAS COMPLETADAS
-        if test_results:
-            # Crear grupo de prueba
-            test_group = {
-                "test_name": test_name,
-                "test_type": self.current_test_type,
-                "repetition": current_repetition,
-                "completed_at": time.time(),
-                "results": test_results,
-                "summary": {
-                    "total": len(test_results),
-                    "passed": sum(1 for r in test_results if r["is_passed"]),
-                    "failed": sum(1 for r in test_results if not r["is_passed"]),
-                    "success_rate": (sum(1 for r in test_results if r["is_passed"]) / len(test_results)) * 100
-                }
-            }
-            
-            self.completed_tests.append(test_group)
-            print(f"[TEST_TABLE] 💾 Guardados {len(test_results)} resultados para {test_name}")
-            print(f"[TEST_TABLE] 📊 Total grupos de pruebas: {len(self.completed_tests)}")
-        
-        # 🔥 LIMPIAR DATOS PERO PRESERVAR SERIALES
-        self.clear_data_preserve_serials(serials_to_preserve)
-        
-        # 🔥 DETENER TIMER Y ACTUALIZAR BOTONES
-        if self.timer_module:
-            self.timer_module.stop_countdown()
-        
-        self.start_test_button.disabled = False
-        self.finish_test_button.disabled = True
-        
-        # 🔥 MARCAR PRUEBA COMO NO EN PROGRESO
-        self.test_in_progress = False
-        self.active_test_type = None
-        
-        if hasattr(self, 'on_test_control'):
-            self.on_test_control("finish")
-            
-        try:
-            self.start_test_button.update()
-            self.finish_test_button.update()
-        except:
-            pass
-            
-        print(f"[TEST_TABLE] ✅ Prueba finalizada: {test_name}")
-        print(f"[TEST_TABLE] 🔄 Sistema listo para nueva prueba")
 
     def _navigate_to_reports(self, session_id):
         """🔥 NAVEGA A LA NUEVA VISTA DE RESUMEN CON DATOS COMPLETOS"""
@@ -2260,14 +2125,14 @@ Esta acción guardará todos los datos en la base de datos y generará los infor
                 
                 ft.Row([
                     ft.ElevatedButton(
-                        "🏠 Volver al Inicio",
+                        "Volver al Inicio",
                         on_click=lambda e: self._go_to_home(),
                         bgcolor=ft.Colors.BLUE_600,
                         color="white",
                         width=200,
                     ),
                     ft.ElevatedButton(
-                        "🔄 Nueva Sesión",
+                        "Nueva Sesión",
                         on_click=lambda e: self._start_new_session(),
                         bgcolor=ft.Colors.GREEN_600,
                         color="white",
@@ -2612,11 +2477,6 @@ Esta acción guardará todos los datos en la base de datos y generará los infor
             traceback.print_exc()
             raise Exception(f"Error guardando en base de datos: {str(e)}")
     
-    
-    # 🔥 FUNCIONES PÚBLICAS PARA COMPATIBILIDAD
-    def actualizar_valores_instantaneos(self, q1, q2, q3, q4):
-        """Wrapper para compatibilidad"""
-        return self.update_instant_values(q1, q2, q3, q4)
 
 def create_test_table_module(on_data_changed):
     """Función factory para crear el módulo de tabla"""

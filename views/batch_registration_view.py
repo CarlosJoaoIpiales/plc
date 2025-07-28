@@ -119,7 +119,7 @@ def get_batch_registration_view(page, on_continue):
         page.update()
 
     def save_new_client(e):
-        """Guarda un nuevo cliente usando solo el nombre"""
+        """Guarda un nuevo cliente con todos los datos del formulario"""
         name = client_name_field.value.strip().upper()
         phone = client_phone_field.value.strip()
         address = client_address_field.value.strip()
@@ -140,9 +140,16 @@ def get_batch_registration_view(page, on_continue):
             return
         
         try:
-            # 🔥 CORECCIÓN: PASAR SOLO EL NOMBRE, NO EL DICCIONARIO COMPLETO
-            print(f"[CLIENT] 💾 Guardando cliente: {name}")
-            add_client(name)  # 🔥 SOLO EL NOMBRE COMO STRING
+            # 🔥 SOLUCIÓN: CREAR DICCIONARIO CON TODOS LOS DATOS
+            client_data = {
+                "name": name,
+                "phone": phone,
+                "address": address,
+                "email": email
+            }
+            
+            print(f"[CLIENT] 💾 Guardando cliente completo: {client_data}")
+            add_client(client_data)  # 🔥 ENVIAR DICCIONARIO COMPLETO
             
             # 🔥 ACTUALIZAR DROPDOWN CON NUEVA LISTA
             updated_clients = get_all_clients()
@@ -153,7 +160,7 @@ def get_batch_registration_view(page, on_continue):
             page.dialog.open = False
             page.update()
             
-            print(f"[CLIENT] ✅ Cliente '{name}' guardado exitosamente")
+            print(f"[CLIENT] ✅ Cliente '{name}' guardado exitosamente con todos los datos")
             
         except Exception as ex:
             print(f"[CLIENT] ❌ Error guardando cliente: {ex}")
