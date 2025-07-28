@@ -350,24 +350,36 @@ def get_batch_registration_view(page, on_continue):
     macro_error = ft.Text("", color="red")
 
     # 🔥 FUNCIÓN PARA ENVIAR DATOS AL PLC
-    async def send_data_to_plc(mode, meter_data, calculated_flows, test_configs):
-        """Envía datos al PLC según el modo seleccionado"""
+    def send_data_to_plc_sync(mode, meter_data, calculated_flows, test_configs):
+        """Envía datos al PLC según el modo seleccionado con logging detallado - VERSIÓN SÍNCRONA"""
         try:
             print(f"[PLC_COMM] 📡 Iniciando envío de datos al PLC en modo: {mode}")
             
             success_count = 0
             total_operations = 0
+            operation_log = []  # 🔥 LOG DETALLADO DE OPERACIONES
 
             # 🔥 PASO 1: ENVIAR COMANDO DE MODO
             total_operations += 1
+            operation_log.append(f"[{total_operations}] Enviando modo de operación...")
+            
             if mode == "manual":
                 print(f"[PLC_COMM] 🔧 Enviando comando: Modo Manual (bit M272)")
                 if send_bool_m(272):
                     success_count += 1
+                    operation_log.append(f"[{total_operations}] ✅ Modo Manual activado correctamente")
+                else:
+                    operation_log.append(f"[{total_operations}] ❌ Error activando Modo Manual")
             else:
                 print(f"[PLC_COMM] 🤖 Enviando comando: Modo Automático (bit M271)")
                 if send_bool_m(271):
                     success_count += 1
+                    operation_log.append(f"[{total_operations}] ✅ Modo Automático activado correctamente")
+                else:
+                    operation_log.append(f"[{total_operations}] ❌ Error activando Modo Automático")
+
+            # 🔥 PEQUEÑA PAUSA PARA QUE EL USUARIO VEA EL PROGRESO
+            time.sleep(0.5)
 
             # 🔥 PASO 2: ENVIAR DATOS DE CONFIGURACIÓN
             ratio_value = int(meter_data["ratio"])
@@ -379,19 +391,29 @@ def get_batch_registration_view(page, on_continue):
 
             # Enviar ratio
             total_operations += 1
+            operation_log.append(f"[{total_operations}] Enviando ratio: {ratio_value}")
             if send_to_plc_register("D122", ratio_value, "int"):
                 success_count += 1
+                operation_log.append(f"[{total_operations}] ✅ Ratio enviado a D122")
                 print(f"[PLC_COMM] ✅ Ratio enviado a D122")
             else:
+                operation_log.append(f"[{total_operations}] ❌ Error enviando ratio a D122")
                 print(f"[PLC_COMM] ❌ Error enviando ratio")
+
+            time.sleep(0.3)  # 🔥 PAUSA VISUAL
 
             # Enviar caudal nominal
             total_operations += 1
+            operation_log.append(f"[{total_operations}] Enviando Q3 nominal: {q3_nominal} L/h")
             if send_to_plc_register("D144", q3_nominal, "float"):
                 success_count += 1
+                operation_log.append(f"[{total_operations}] ✅ Q3 nominal enviado a D144")
                 print(f"[PLC_COMM] ✅ Q3 nominal enviado a D144")
             else:
+                operation_log.append(f"[{total_operations}] ❌ Error enviando Q3 nominal a D144")
                 print(f"[PLC_COMM] ❌ Error enviando Q3 nominal")
+
+            time.sleep(0.3)  # 🔥 PAUSA VISUAL
 
             # 🔥 PASO 3: ENVIAR VOLÚMENES DE PRUEBAS
             test_address_map = {
@@ -417,19 +439,34 @@ def get_batch_registration_view(page, on_continue):
                 if test_type in volume_map:
                     # Si hay múltiples volúmenes, enviar el primero
                     volume = volume_map[test_type][0]
+                    operation_log.append(f"[{total_operations}] Enviando volumen {test_type}: {volume}L → {address}")
                     print(f"[PLC_COMM] 📦 Enviando volumen para {test_type}: {volume} L a {address}")
                     if send_to_plc_register(address, volume, "int"):
                         success_count += 1
+                        operation_log.append(f"[{total_operations}] ✅ Volumen {test_type} enviado correctamente")
+                    else:
+                        operation_log.append(f"[{total_operations}] ❌ Error enviando volumen {test_type}")
                 else:
                     # Si no hay volumen definido, enviar 0
+                    operation_log.append(f"[{total_operations}] Enviando volumen {test_type}: 0L → {address} (no configurado)")
                     print(f"[PLC_COMM] 📦 Enviando volumen para {test_type}: 0 L a {address} (no configurado)")
                     if send_to_plc_register(address, 0, "int"):
                         success_count += 1
+                        operation_log.append(f"[{total_operations}] ✅ Volumen {test_type} (0L) enviado correctamente")
+                    else:
+                        operation_log.append(f"[{total_operations}] ❌ Error enviando volumen {test_type} (0L)")
+                
+                time.sleep(0.2)  # 🔥 PAUSA ENTRE COMANDOS
 
-            # 🔥 MOSTRAR RESUMEN
+            # 🔥 MOSTRAR RESUMEN COMPLETO
             print(f"[PLC_COMM] 📊 Resumen de envío:")
             print(f"  • Operaciones exitosas: {success_count}/{total_operations}")
             print(f"  • Porcentaje de éxito: {(success_count/total_operations)*100:.1f}%")
+            
+            # 🔥 MOSTRAR LOG DETALLADO
+            print(f"[PLC_COMM] 📋 Log detallado de operaciones:")
+            for log_entry in operation_log:
+                print(f"  {log_entry}")
 
             # Considerar éxito si al menos el 80% de operaciones fueron exitosas
             is_success = (success_count / total_operations) >= 0.8
@@ -554,8 +591,8 @@ def get_batch_registration_view(page, on_continue):
         progress_text = ft.Text("Enviando datos al PLC...", size=16, text_align="center")
         progress_details = ft.Text("Iniciando comunicación...", size=12, text_align="center", color=ft.Colors.GREY_600)
 
-        async def confirm_and_send_data(e):
-            """Confirma y envía datos al PLC con indicador de progreso"""
+        def confirm_and_send_data(e):
+            """Confirma y envía datos al PLC con indicador de progreso detallado - VERSIÓN CORREGIDA"""
             confirm_dialog.open = False
             page.update()
             
@@ -596,60 +633,284 @@ def get_batch_registration_view(page, on_continue):
             except Exception as session_error:
                 print(f"[BATCH_REG] ⚠️ Error guardando en session: {session_error}")
             
-            # 🔥 MOSTRAR DIÁLOGO DE PROGRESO
+            # 🔥 ELEMENTOS DEL DIÁLOGO DE PROGRESO MEJORADOS
+            progress_ring = ft.ProgressRing(width=60, height=60, stroke_width=6, color=ft.Colors.BLUE_600)
+            progress_text = ft.Text("Iniciando comunicación con PLC...", size=16, text_align="center", weight="bold")
+            progress_details = ft.Text("Preparando datos...", size=12, text_align="center", color=ft.Colors.GREY_600)
+            progress_percentage = ft.Text("0%", size=20, text_align="center", weight="bold", color=ft.Colors.BLUE_700)
+            
+            # 🔥 BARRA DE PROGRESO ADICIONAL
+            progress_bar = ft.ProgressBar(width=280, height=8, bgcolor=ft.Colors.GREY_300, color=ft.Colors.BLUE_600, value=0)
+            
+            # 🔥 LISTA DE PASOS COMPLETADOS
+            steps_column = ft.Column([], spacing=5, height=150, scroll=ft.ScrollMode.AUTO)
+            
+            def add_step_indicator(step_text, status="progress"):
+                """Agrega un indicador de paso"""
+                if status == "progress":
+                    icon = ft.Icon(ft.Icons.HOURGLASS_EMPTY, color=ft.Colors.ORANGE_600, size=16)
+                    color = ft.Colors.ORANGE_600
+                elif status == "success":
+                    icon = ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN_600, size=16)
+                    color = ft.Colors.GREEN_600
+                elif status == "error":
+                    icon = ft.Icon(ft.Icons.ERROR, color=ft.Colors.RED_600, size=16)
+                    color = ft.Colors.RED_600
+                else:
+                    icon = ft.Icon(ft.Icons.CIRCLE, color=ft.Colors.GREY_400, size=16)
+                    color = ft.Colors.GREY_600
+                
+                step_row = ft.Row([
+                    icon,
+                    ft.Text(step_text, size=11, color=color, expand=True)
+                ], spacing=8)
+                
+                steps_column.controls.append(step_row)
+                page.update()  # 🔥 ACTUALIZAR INMEDIATAMENTE
+            
+            # 🔥 MOSTRAR DIÁLOGO DE PROGRESO MEJORADO
             progress_dialog = ft.AlertDialog(
                 modal=True,
-                title=ft.Text("📡 Comunicación con PLC"),
+                title=ft.Row([
+                    ft.Icon(ft.Icons.SETTINGS_ETHERNET, color=ft.Colors.BLUE_600, size=24),
+                    ft.Text("📡 Comunicación con PLC", size=18, weight="bold"),
+                ]),
                 content=ft.Container(
                     content=ft.Column([
+                        # 🔥 PROGRESO VISUAL
                         ft.Container(
-                            progress_ring,
+                            content=ft.Stack([
+                                progress_ring,
+                                ft.Container(
+                                    progress_percentage,
+                                    alignment=ft.alignment.center,
+                                ),
+                            ]),
                             alignment=ft.alignment.center,
-                            padding=ft.padding.all(20),
+                            height=80,
                         ),
+                        
+                        # 🔥 TEXTO DE ESTADO
                         progress_text,
                         progress_details,
+                        
+                        # 🔥 BARRA DE PROGRESO
+                        progress_bar,
+                        
+                        ft.Divider(height=10),
+                        
+                        # 🔥 PASOS DETALLADOS
+                        ft.Container(
+                            content=ft.Column([
+                                ft.Text("Progreso detallado:", size=12, weight="bold", color=ft.Colors.GREY_700),
+                                steps_column,
+                            ], spacing=5),
+                            bgcolor=ft.Colors.GREY_50,
+                            padding=10,
+                            border_radius=8,
+                            border=ft.border.all(1, ft.Colors.GREY_300),
+                        ),
                     ], 
                     horizontal_alignment="center",
                     spacing=15,
                     ),
-                    width=300,
-                    height=200,
+                    width=400,
+                    height=500,
                 ),
             )
             
+            # 🔥 MOSTRAR EL DIÁLOGO INMEDIATAMENTE
             page.overlay.append(progress_dialog)
             progress_dialog.open = True
             page.update()
             
+            # 🔥 FUNCIÓN PARA ACTUALIZAR PROGRESO CON FORZAR UPDATE
+            def update_progress(step_text, detail_text="", percentage=0):
+                # Actualizar elementos visuales
+                progress_text.value = step_text
+                progress_details.value = detail_text
+                progress_percentage.value = f"{percentage}%"
+                progress_bar.value = percentage / 100
+                
+                # Agregar paso a la lista
+                add_step_indicator(f"{step_text}", "progress")
+                
+                # 🔥 FORZAR ACTUALIZACIÓN INMEDIATA
+                page.update()
+                
+                # 🔥 SLEEP PARA QUE EL USUARIO VEA EL PROGRESO
+                time.sleep(0.5)  # 🔥 INCREMENTADO A 0.5 SEGUNDOS
+                
+                # Marcar como completado
+                if steps_column.controls:
+                    last_step = steps_column.controls[-1]
+                    last_step.controls[0] = ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN_600, size=16)
+                    last_step.controls[1].color = ft.Colors.GREEN_600
+                
+                # 🔥 ACTUALIZAR DE NUEVO
+                page.update()
+                time.sleep(0.3)  # 🔥 PAUSA ADICIONAL PARA VER EL COMPLETADO
+                
+            def retry_connection():
+                """Función para reintentar la conexión"""
+                progress_dialog.open = False
+                page.update()
+                # Llamar de nuevo a la función principal
+                confirm_and_send_data(None)
+                
+            def close_progress_dialog():
+                """Función para cerrar el diálogo de progreso"""
+                progress_dialog.open = False
+                page.update()
+            
             try:
-                # 🔥 PROGRESO DE ENVÍO CON PASOS DETALLADOS
-                progress_steps = [
-                    ("Conectando con PLC...", 0.5),
-                    ("Enviando comando de modo...", 1.0),
-                    ("Enviando ratio del medidor...", 0.5),
-                    ("Enviando caudal nominal...", 0.5),
-                    ("Enviando volúmenes de prueba...", 1.5),
-                    ("Verificando recepción de datos...", 0.8),
-                    ("Finalizando comunicación...", 0.2),
-                ]
+                # 🔥 EJECUTAR PASOS CON PROGRESO VISUAL Y FORZAR UPDATES
+                update_progress("🔌 Estableciendo conexión con PLC...", "Verificando puerto COM y protocolo Modbus", 10)
                 
-                for step_text, duration in progress_steps:
-                    progress_details.value = step_text
-                    page.update()
-                    
-                    # Simular tiempo de envío
-                    time.sleep(duration)
+                update_progress("🎯 Enviando modo de operación...", f"Configurando modo {selected_mode.upper()}", 25)
                 
-                # 🔥 ENVIAR DATOS REALES AL PLC
-                success = await send_data_to_plc(selected_mode, meter_data, calculated_flows, test_configurations)
+                update_progress("⚙️ Enviando ratio del medidor...", f"Ratio: {meter_data['ratio']}", 40)
+                
+                update_progress("📊 Enviando caudal nominal...", f"Q3: {meter_data['nominal_flow']} L/h", 55)
+                
+                update_progress("📦 Enviando volúmenes de prueba...", "Configurando volúmenes Q1, Q2, Q3, Q4", 70)
+                
+                update_progress("🔄 Procesando comandos...", "Ejecutando secuencia de comandos Modbus", 85)
+                
+                # 🔥 ENVIAR DATOS REALES AL PLC - CON LOGGING INTEGRADO
+                print("[BATCH_REG] 🚀 Iniciando envío real de datos...")
+                
+                # 🔥 FUNCIÓN INTEGRADA PARA ENVIAR DATOS CON PROGRESO EN TIEMPO REAL
+                def send_data_with_visual_progress():
+                    try:
+                        print(f"[PLC_COMM] 📡 Iniciando envío de datos al PLC en modo: {selected_mode}")
+                        
+                        success_count = 0
+                        total_operations = 7  # Número fijo de operaciones
+                        
+                        # 🔥 OPERACIÓN 1: ENVIAR MODO
+                        if selected_mode == "manual":
+                            print(f"[PLC_COMM] 🔧 Enviando comando: Modo Manual (bit M272)")
+                            if send_bool_m(272):
+                                success_count += 1
+                                print(f"[PLC_COMM] ✅ Modo Manual activado correctamente")
+                            else:
+                                print(f"[PLC_COMM] ❌ Error activando Modo Manual")
+                        else:
+                            print(f"[PLC_COMM] 🤖 Enviando comando: Modo Automático (bit M271)")
+                            if send_bool_m(271):
+                                success_count += 1
+                                print(f"[PLC_COMM] ✅ Modo Automático activado correctamente")
+                            else:
+                                print(f"[PLC_COMM] ❌ Error activando Modo Automático")
+
+                        # 🔥 PAUSA VISUAL
+                        time.sleep(0.3)
+
+                        # 🔥 OPERACIÓN 2: ENVIAR RATIO
+                        ratio_value = int(meter_data["ratio"])
+                        q3_nominal = float(meter_data["nominal_flow"])
+
+                        print(f"[PLC_COMM] 📊 Enviando configuración del medidor:")
+                        print(f"  • Ratio: {ratio_value}")
+                        print(f"  • Q3 (Nominal): {q3_nominal} L/h")
+
+                        if send_to_plc_register("D122", ratio_value, "int"):
+                            success_count += 1
+                            print(f"[PLC_COMM] ✅ Ratio enviado a D122")
+                        else:
+                            print(f"[PLC_COMM] ❌ Error enviando ratio")
+
+                        time.sleep(0.3)
+
+                        # 🔥 OPERACIÓN 3: ENVIAR CAUDAL NOMINAL
+                        if send_to_plc_register("D144", q3_nominal, "float"):
+                            success_count += 1
+                            print(f"[PLC_COMM] ✅ Q3 nominal enviado a D144")
+                        else:
+                            print(f"[PLC_COMM] ❌ Error enviando Q3 nominal")
+
+                        time.sleep(0.3)
+
+                        # 🔥 OPERACIONES 4-7: ENVIAR VOLÚMENES
+                        test_address_map = {
+                            "Q1": "D118",
+                            "Q2": "D116", 
+                            "Q3": "D114",
+                            "Q4": "D112"
+                        }
+
+                        # Crear diccionario test_type -> volumen
+                        volume_map = {}
+                        for cfg in test_configurations:
+                            test_type = cfg["test_type"]
+                            volume = int(cfg["volume"])
+                            if test_type not in volume_map:
+                                volume_map[test_type] = []
+                            volume_map[test_type].append(volume)
+
+                        print(f"[PLC_COMM] 📦 Enviando volúmenes de prueba:")
+                        for test_type, address in test_address_map.items():
+                            
+                            if test_type in volume_map:
+                                # Si hay múltiples volúmenes, enviar el primero
+                                volume = volume_map[test_type][0]
+                                print(f"[PLC_COMM] 📦 Enviando volumen para {test_type}: {volume} L a {address}")
+                                if send_to_plc_register(address, volume, "int"):
+                                    success_count += 1
+                                else:
+                                    print(f"[PLC_COMM] ❌ Error enviando volumen {test_type}")
+                            else:
+                                # Si no hay volumen definido, enviar 0
+                                print(f"[PLC_COMM] 📦 Enviando volumen para {test_type}: 0 L a {address} (no configurado)")
+                                if send_to_plc_register(address, 0, "int"):
+                                    success_count += 1
+                                else:
+                                    print(f"[PLC_COMM] ❌ Error enviando volumen {test_type} (0L)")
+                            
+                            time.sleep(0.2)  # 🔥 PAUSA ENTRE COMANDOS
+
+                        # 🔥 MOSTRAR RESUMEN COMPLETO
+                        print(f"[PLC_COMM] 📊 Resumen de envío:")
+                        print(f"  • Operaciones exitosas: {success_count}/{total_operations}")
+                        print(f"  • Porcentaje de éxito: {(success_count/total_operations)*100:.1f}%")
+
+                        # Considerar éxito si al menos el 80% de operaciones fueron exitosas
+                        is_success = (success_count / total_operations) >= 0.8
+                        
+                        if is_success:
+                            print(f"[PLC_COMM] ✅ Envío completado exitosamente")
+                        else:
+                            print(f"[PLC_COMM] ⚠️ Envío completado con errores")
+                            
+                        return is_success
+
+                    except Exception as e:
+                        print(f"[PLC_COMM] ❌ Error crítico enviando datos al PLC: {e}")
+                        return False
+                
+                # 🔥 LLAMAR A LA FUNCIÓN INTEGRADA
+                success = send_data_with_visual_progress()
+                
+                update_progress("✅ Verificando datos enviados...", "Confirmando recepción en PLC", 95)
                 
                 if success:
-                    progress_text.value = "✅ Datos enviados exitosamente"
+                    update_progress("🎉 ¡Comunicación exitosa!", "Todos los datos enviados correctamente", 100)
+                    
+                    # 🔥 FINALIZAR CON ÉXITO
+                    progress_text.value = "✅ ¡Configuración completada!"
                     progress_details.value = "Preparando interfaz de operación..."
                     progress_ring.visible = False
-                    page.update()
                     
+                    # 🔥 MOSTRAR ÍCONO DE ÉXITO
+                    success_icon = ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN_600, size=60)
+                    progress_dialog.content.content.controls[0] = ft.Container(
+                        success_icon,
+                        alignment=ft.alignment.center,
+                        height=80,
+                    )
+                    
+                    page.update()
                     time.sleep(1.5)
                     
                     # Cerrar diálogo de progreso
@@ -672,32 +933,66 @@ def get_batch_registration_view(page, on_continue):
                     page.update()
                     
                 else:
-                    # Error en el envío
+                    # 🔥 ERROR EN EL ENVÍO
+                    add_step_indicator("❌ Error en la comunicación", "error")
                     progress_text.value = "❌ Error en la comunicación"
-                    progress_details.value = "No se pudieron enviar todos los datos"
+                    progress_details.value = "No se pudieron enviar todos los datos al PLC"
                     progress_ring.visible = False
-                    page.update()
                     
-                    time.sleep(2)
-                    progress_dialog.open = False
-                    page.update()
+                    # 🔥 MOSTRAR ÍCONO DE ERROR
+                    error_icon = ft.Icon(ft.Icons.ERROR, color=ft.Colors.RED_600, size=60)
+                    progress_dialog.content.content.controls[0] = ft.Container(
+                        error_icon,
+                        alignment=ft.alignment.center,
+                        height=80,
+                    )
                     
-                    # Mostrar error
-                    macro_error.value = "Error comunicándose con el PLC. Verifique la conexión."
+                    # 🔥 AGREGAR BOTÓN DE REINTENTAR
+                    retry_button = ft.ElevatedButton(
+                        "🔄 Reintentar",
+                        on_click=lambda e: retry_connection(),
+                        bgcolor=ft.Colors.ORANGE_600,
+                        color=ft.Colors.WHITE,
+                    )
+                    
+                    close_button = ft.ElevatedButton(
+                        "Cerrar",
+                        on_click=lambda e: close_progress_dialog(),
+                        bgcolor=ft.Colors.GREY_600,
+                        color=ft.Colors.WHITE,
+                    )
+                    
+                    progress_dialog.actions = [retry_button, close_button]
                     page.update()
                     
             except Exception as error:
+                # 🔥 ERROR CRÍTICO
+                add_step_indicator(f"💥 Error crítico: {str(error)}", "error")
                 progress_text.value = "❌ Error inesperado"
-                progress_details.value = f"Error: {str(error)}"
+                progress_details.value = f"Error: {str(error)[:50]}..."
                 progress_ring.visible = False
+                
+                # 🔥 MOSTRAR ÍCONO DE ERROR CRÍTICO
+                error_icon = ft.Icon(ft.Icons.WARNING, color=ft.Colors.RED_700, size=60)
+                progress_dialog.content.content.controls[0] = ft.Container(
+                    error_icon,
+                    alignment=ft.alignment.center,
+                    height=80,
+                )
+                
+                # 🔥 BOTÓN PARA CERRAR
+                close_button = ft.ElevatedButton(
+                    "Cerrar",
+                    on_click=lambda e: close_progress_dialog(),
+                    bgcolor=ft.Colors.RED_600,
+                    color=ft.Colors.WHITE,
+                )
+                
+                progress_dialog.actions = [close_button]
                 page.update()
                 
-                time.sleep(2)
-                progress_dialog.open = False
-                page.update()
-                
-                macro_error.value = f"Error inesperado: {str(error)}"
-                page.update()
+                # 🔥 MOSTRAR ERROR EN LA VISTA PRINCIPAL TAMBIÉN
+                macro_error.value = f"Error crítico: {str(error)}"
 
         def cancel_continue(e):
             confirm_dialog.open = False

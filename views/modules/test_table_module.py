@@ -121,7 +121,6 @@ class TestTableModule:
             bgcolor=ft.Colors.DEEP_ORANGE_600,
             color="white",
             on_click=self._on_end_tests,
-            icon=ft.Icons.ASSIGNMENT_TURNED_IN
         )
 
         # 🔥 INICIALIZAR TABLA CON UNA FILA POR DEFECTO
@@ -1241,8 +1240,8 @@ Los datos han sido guardados y la tabla está lista para la siguiente prueba."""
                 dialog.page.update()
                 
             dialog = ft.AlertDialog(
-                title=ft.Text("📋 Historial de Pruebas"),
-                content=ft.Text("📭 No hay pruebas completadas aún", size=16, text_align="center"),
+                title=ft.Text("Historial de Pruebas"),
+                content=ft.Text("No hay pruebas completadas aún", size=16, text_align="center"),
                 actions=[ft.TextButton("Cerrar", on_click=close_dialog)],
             )
             
@@ -1642,18 +1641,18 @@ Los datos han sido guardados y la tabla está lista para la siguiente prueba."""
         
         summary_text = f"""📊 Resumen de la sesión:
 
-🧪 Grupos de pruebas realizados: {total_tests}
-📏 Total de medidores probados: {total_meters}
-✅ Medidores aprobados: {total_passed}
-❌ Medidores reprobados: {total_meters - total_passed}
-📈 Tasa de éxito general: {(total_passed/total_meters*100):.1f}%
+Grupos de pruebas realizados: {total_tests}
+Total de medidores probados: {total_meters}
+Medidores aprobados: {total_passed}
+Medidores reprobados: {total_meters - total_passed}
+Tasa de éxito general: {(total_passed/total_meters*100):.1f}%
 
 Esta acción guardará todos los datos en la base de datos y generará los informes finales.
 
 ¿Está seguro de finalizar la sesión de pruebas?"""
         
         confirm_dialog = ft.AlertDialog(
-            title=ft.Text("🏁 Finalizar Sesión de Pruebas", size=18, weight="bold"),
+            title=ft.Text("Finalizar Sesión de Pruebas", size=18, weight="bold"),
             content=ft.Container(
                 content=ft.Text(summary_text, size=14),
                 width=400,
@@ -1689,7 +1688,7 @@ Esta acción guardará todos los datos en la base de datos y generará los infor
 
             progress_dialog = ft.AlertDialog(
                 modal=True,
-                title=ft.Text("🏁 Finalizando Sesión"),
+                title=ft.Text("Finalizando Sesión"),
                 content=ft.Container(
                     content=ft.Column([
                         ft.Container(
@@ -1895,10 +1894,6 @@ Esta acción guardará todos los datos en la base de datos y generará los infor
                 "batch": "nuevo",
             }
 
-    def force_q4_test_setup(self):
-        """🔥 FUNCIÓN DESHABILITADA: Ya no se ejecuta automáticamente"""
-        print("[TEST_TABLE] 🔇 force_q4_test_setup() deshabilitada - usar calibración manual")
-        return
 
     def test_timer_functionality(self):
         """🔥 FUNCIÓN DESHABILITADA: Ya no se ejecuta automáticamente"""
@@ -2238,20 +2233,20 @@ Esta acción guardará todos los datos en la base de datos y generará los infor
             
             # 🔥 CONTENIDO DEL RESUMEN
             summary_content = ft.Column([
-                ft.Text("📋 Resumen de la Sesión Finalizada", size=24, weight="bold", color=ft.Colors.BLUE_900),
+                ft.Text("Resumen de la Sesión Finalizada", size=24, weight="bold", color=ft.Colors.BLUE_900),
                 ft.Divider(),
                 
-                ft.Text(f"✅ Sesión guardada exitosamente en la base de datos", size=16, color=ft.Colors.GREEN, weight="bold"),
-                ft.Text(f"🆔 ID de Sesión: {summary_data['session_id']}", size=14, color=ft.Colors.GREY_700),
+                ft.Text(f"Sesión guardada exitosamente en la base de datos", size=16, color=ft.Colors.GREEN, weight="bold"),
+                ft.Text(f"ID de Sesión: {summary_data['session_id']}", size=14, color=ft.Colors.GREY_700),
                 
                 ft.Divider(),
                 
-                ft.Text("📊 Estadísticas Generales:", size=18, weight="bold", color=ft.Colors.PURPLE_700),
-                ft.Text(f"🧪 Grupos de pruebas realizados: {summary_data['total_groups']}", size=14),
-                ft.Text(f"📏 Total de medidores probados: {total_meters}", size=14),
-                ft.Text(f"✅ Medidores aprobados: {total_passed}", size=14, color=ft.Colors.GREEN),
-                ft.Text(f"❌ Medidores reprobados: {total_meters - total_passed}", size=14, color=ft.Colors.RED),
-                ft.Text(f"📈 Tasa de éxito: {success_rate:.1f}%", size=16, weight="bold", 
+                ft.Text("Estadísticas Generales:", size=18, weight="bold", color=ft.Colors.PURPLE_700),
+                ft.Text(f"Grupos de pruebas realizados: {summary_data['total_groups']}", size=14),
+                ft.Text(f"Total de medidores probados: {total_meters}", size=14),
+                ft.Text(f"Medidores aprobados: {total_passed}", size=14, color=ft.Colors.GREEN),
+                ft.Text(f"Medidores reprobados: {total_meters - total_passed}", size=14, color=ft.Colors.RED),
+                ft.Text(f"Tasa de éxito: {success_rate:.1f}%", size=16, weight="bold", 
                        color=ft.Colors.GREEN if success_rate >= 80 else ft.Colors.ORANGE),
                 
                 ft.Divider(),
