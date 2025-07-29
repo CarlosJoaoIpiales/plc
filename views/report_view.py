@@ -41,7 +41,7 @@ def get_report_view(page):
                 ft.DataCell(ft.Text(str(r["initial_reading"]))),
                 ft.DataCell(ft.Text(str(r["final_reading"]))),
                 ft.DataCell(ft.Text(f'{r["error"]:.2f}%')),
-                ft.DataCell(ft.Text("✔" if r["passed"] else "❌", color="green" if r["passed"] else "red")),
+                ft.DataCell(ft.Text("✔" if r["passed"] else "", color="green" if r["passed"] else "red")),
                 ft.DataCell(ft.Text(r["test_date"].strftime("%Y-%m-%d %H:%M"))),
                 ft.DataCell(ft.Text(r["brand"])),
                 ft.DataCell(ft.Text(r["model"])),

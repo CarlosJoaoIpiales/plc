@@ -25,7 +25,7 @@ class TestExecutionView:
         # Crear tipos de pruebas únicos para botones
         self.test_types = list(set(config["test_type"] for config in self.test_configurations))
         
-        print(f"[TEST_EXEC] 🚀 Inicializando ejecución de pruebas:")
+        print(f"[TEST_EXEC]  Inicializando ejecución de pruebas:")
         print(f"  • Modo: {self.operation_mode}")
         print(f"  • Total configuraciones: {len(self.test_configurations)}")
         print(f"  • Tipos de prueba: {self.test_types}")
@@ -35,87 +35,87 @@ class TestExecutionView:
         
     def init_modules(self):
         """Inicializa todos los módulos"""
-        # 🔥 CREAR MÓDULO DE VALORES INSTANTÁNEOS UNA SOLA VEZ
+        #  CREAR MÓDULO DE VALORES INSTANTÁNEOS UNA SOLA VEZ
         self.instant_values = create_instant_values_module()
-        print("[TEST_EXEC] ✅ Módulo de valores instantáneos creado")
+        print("[TEST_EXEC]  Módulo de valores instantáneos creado")
 
-        # 🔥 CREAR TIMER PRIMERO
+        #  CREAR TIMER PRIMERO
         self.timer_module = create_timer_module(self.on_timer_finished)
-        print("[TEST_EXEC] ✅ Módulo de timer creado")
+        print("[TEST_EXEC]  Módulo de timer creado")
 
-        # 🔥 CREAR LA TABLA DESPUÉS
+        #  CREAR LA TABLA DESPUÉS
         self.test_table = create_test_table_module(self.on_table_data_changed)
-        print("[TEST_EXEC] ✅ Módulo de tabla creado")
+        print("[TEST_EXEC]  Módulo de tabla creado")
 
-        # 🔥 CONECTAR TIMER CON LA TABLA
+        #  CONECTAR TIMER CON LA TABLA
         self.test_table.set_timer_module(self.timer_module)
         print("[TEST_EXEC] 🔗 Timer conectado con tabla")
 
-        # 🔥 ESTABLECER REFERENCIA A LA PÁGINA PARA ACCESO A CONFIGURACIONES
+        #  ESTABLECER REFERENCIA A LA PÁGINA PARA ACCESO A CONFIGURACIONES
         self.test_table.set_page_reference(self.page)
         print("[TEST_EXEC] 🔗 Referencia de página establecida en tabla")
 
-        # 🔥 GUARDAR CONFIGURACIONES EN LA SESIÓN DE LA PÁGINA - CORREGIDO
+        #  GUARDAR CONFIGURACIONES EN LA SESIÓN DE LA PÁGINA - CORREGIDO
         try:
-            # 🔥 USAR EL MÉTODO SET DE SESSIONSTORAGE
+            #  USAR EL MÉTODO SET DE SESSIONSTORAGE
             if hasattr(self.page, 'session') and hasattr(self.page.session, 'set'):
                 self.page.session.set("test_configurations", self.test_configurations)
                 print(f"[TEST_EXEC] 💾 Guardadas {len(self.test_configurations)} configuraciones en sesión (método .set)")
             else:
-                # 🔥 ALTERNATIVA: USAR ATRIBUTO DE LA CLASE PARA PASAR CONFIGURACIONES
+                #  ALTERNATIVA: USAR ATRIBUTO DE LA CLASE PARA PASAR CONFIGURACIONES
                 self.test_table.set_test_configurations_directly(self.test_configurations)
                 print(f"[TEST_EXEC] 💾 Configuraciones pasadas directamente a la tabla: {len(self.test_configurations)}")
         except Exception as e:
-            print(f"[TEST_EXEC] ⚠️ Error guardando en sesión: {e}")
-            # 🔥 FALLBACK: PASAR CONFIGURACIONES DIRECTAMENTE
+            print(f"[TEST_EXEC]  Error guardando en sesión: {e}")
+            #  FALLBACK: PASAR CONFIGURACIONES DIRECTAMENTE
             self.test_table.set_test_configurations_directly(self.test_configurations)
             print(f"[TEST_EXEC] 💾 Configuraciones pasadas como fallback: {len(self.test_configurations)}")
         
-        # 🔥 DEBUG: MOSTRAR CONFIGURACIONES GUARDADAS
-        print(f"[TEST_EXEC] 🔍 === DEBUG CONFIGURACIONES GUARDADAS ===")
+        #  DEBUG: MOSTRAR CONFIGURACIONES GUARDADAS
+        print(f"[TEST_EXEC]  === DEBUG CONFIGURACIONES GUARDADAS ===")
         for i, config in enumerate(self.test_configurations):
             print(f"[TEST_EXEC] {i+1}. {config.get('test_name', 'Sin nombre')}")
             print(f"    • Tipo: {config.get('test_type', 'N/A')}")
             print(f"    • Volumen: {config.get('volume', 0)} L")
             print(f"    • Tiempo: {config.get('estimated_time', 0):.2f} min")
 
-        # 🔥 CONECTAR TABLA CON MÓDULO DE VALORES INSTANTÁNEOS
+        #  CONECTAR TABLA CON MÓDULO DE VALORES INSTANTÁNEOS
         self.test_table.set_instant_values_module(self.instant_values)
         print("[TEST_EXEC] 🔗 Tabla conectada con módulo de valores instantáneos")
 
-        # 🔥 CONFIGURAR CALLBACK DE VALORES INSTANTÁNEOS HACIA LA TABLA
+        #  CONFIGURAR CALLBACK DE VALORES INSTANTÁNEOS HACIA LA TABLA
         def send_values_to_table(q1, q2, q3, q4):
             """Callback que envía valores instantáneos a la tabla"""
             try:
-                # 🔥 ENVIAR VALORES DIRECTAMENTE A LA TABLA
+                #  ENVIAR VALORES DIRECTAMENTE A LA TABLA
                 self.test_table.update_instant_values(q1, q2, q3, q4)
             except Exception as e:
-                print(f"[TEST_EXEC] ❌ Error enviando valores a tabla: {e}")
+                print(f"[TEST_EXEC]  Error enviando valores a tabla: {e}")
 
-        # 🔥 CONFIGURAR EL CALLBACK EN EL MÓDULO DE VALORES INSTANTÁNEOS
+        #  CONFIGURAR EL CALLBACK EN EL MÓDULO DE VALORES INSTANTÁNEOS
         self.instant_values.set_value_callback(send_values_to_table)
         print("[TEST_EXEC] 🔗 Callback de valores instantáneos configurado")
 
-        # 🔥 DEBUG: MOSTRAR CONFIGURACIONES DISPONIBLES
+        #  DEBUG: MOSTRAR CONFIGURACIONES DISPONIBLES
         self.test_table.debug_show_configurations()
 
-        print("[TEST_EXEC] 📊 Sistema listo - esperando calibración manual")
+        print("[TEST_EXEC]  Sistema listo - esperando calibración manual")
 
-        # 🔥 VERIFICACIÓN EXHAUSTIVA DE LA CONEXIÓN (SIN EJECUTAR FUNCIONES)
+        #  VERIFICACIÓN EXHAUSTIVA DE LA CONEXIÓN (SIN EJECUTAR FUNCIONES)
         if hasattr(self.test_table, 'instant_values_module') and self.test_table.instant_values_module:
-            print("[TEST_EXEC] ✅ Verificación de conexión exitosa")
+            print("[TEST_EXEC]  Verificación de conexión exitosa")
             
-            # 🔥 VERIFICAR QUE LAS FUNCIONES EXISTAN (PERO NO EJECUTARLAS)
+            #  VERIFICAR QUE LAS FUNCIONES EXISTAN (PERO NO EJECUTARLAS)
             required_functions = ['get_pattern_value_for_test', 'get_current_values', 'debug_all_values']
             for func_name in required_functions:
                 if hasattr(self.test_table.instant_values_module, func_name):
-                    print(f"[TEST_EXEC] ✅ Función {func_name} disponible")
+                    print(f"[TEST_EXEC]  Función {func_name} disponible")
                 else:
-                    print(f"[TEST_EXEC] ❌ Función {func_name} NO disponible")
+                    print(f"[TEST_EXEC]  Función {func_name} NO disponible")
         else:
-            print("[TEST_EXEC] ❌ La conexión no se estableció correctamente")
+            print("[TEST_EXEC]  La conexión no se estableció correctamente")
         
-        # 🔥 CONFIGURAR CALLBACK MODBUS PARA LA TABLA
+        #  CONFIGURAR CALLBACK MODBUS PARA LA TABLA
         def send_modbus_command(bit):
             """Callback para enviar comandos Modbus desde la tabla"""
             try:
@@ -132,30 +132,30 @@ class TestExecutionView:
                 comand_off = build_modbus_ascii_command(
                     1, 5, int(info['high_byte'], 16), int(info['low_byte'], 16), value=0)
                 service = ModbusService()
-                print(f"[TEST_EXEC] 📡 Enviando comando M{bit}")
+                print(f"[TEST_EXEC]  Enviando comando M{bit}")
                 service.send_command(comand_on)
                 time.sleep(0.1)
                 service.send_command(comand_off)
-                print(f"[TEST_EXEC] ✅ Comando M{bit} enviado")
+                print(f"[TEST_EXEC]  Comando M{bit} enviado")
             except Exception as ex:
-                print(f"[TEST_EXEC] ❌ Error enviando comando M{bit}: {ex}")
+                print(f"[TEST_EXEC]  Error enviando comando M{bit}: {ex}")
         
-        # 🔥 CONFIGURAR EL CALLBACK EN LA TABLA
+        #  CONFIGURAR EL CALLBACK EN LA TABLA
         self.test_table.set_modbus_callback(send_modbus_command)
         
-        # 🔥 ACTUALIZAR STATUS DEL MEDIDOR DESDE BATCH DATA
+        #  ACTUALIZAR STATUS DEL MEDIDOR DESDE BATCH DATA
         if hasattr(self.test_data, 'get') and self.test_data.get('batch'):
             meter_status = self.test_data['batch'].lower()
             self.test_table.update_meter_status_from_batch(meter_status)
         
-        # 🔥 CREAR MODE_SELECTION PASANDO LA REFERENCIA A LA TABLA
-        print("[TEST_EXEC] 🔄 Creando módulo de selección de modo...")
+        #  CREAR MODE_SELECTION PASANDO LA REFERENCIA A LA TABLA
+        print("[TEST_EXEC]  Creando módulo de selección de modo...")
         self.mode_selection = create_mode_selection_module(
             self.operation_mode,
             self.on_mode_changed,
-            table_widget=self.test_table  # 🔥 PASAR LA TABLA AQUÍ
+            table_widget=self.test_table  #  PASAR LA TABLA AQUÍ
         )
-        print(f"[TEST_EXEC] ✅ Módulo de selección de modo creado: {type(self.mode_selection)}")
+        print(f"[TEST_EXEC]  Módulo de selección de modo creado: {type(self.mode_selection)}")
         
         # Módulo de botones de pruebas
         self.test_buttons = create_test_buttons_module(
@@ -167,21 +167,21 @@ class TestExecutionView:
             self.on_view_history,
             self.on_end_session
         )
-        print("[TEST_EXEC] ✅ Módulo de botones de pruebas creado")
+        print("[TEST_EXEC]  Módulo de botones de pruebas creado")
         
         # Módulo de historial
         self.history_module = create_test_history_module(
             self.completed_tests
         )
-        print("[TEST_EXEC] ✅ Módulo de historial creado")
+        print("[TEST_EXEC]  Módulo de historial creado")
         
-        print("[TEST_EXEC] ✅ Todos los módulos inicializados correctamente")
+        print("[TEST_EXEC]  Todos los módulos inicializados correctamente")
 
     
     def on_mode_changed(self, new_mode):
         """Maneja cambios en el modo de operación"""
         self.operation_mode = new_mode
-        print(f"[TEST_EXEC] 🔄 Modo cambiado a: {new_mode}")
+        print(f"[TEST_EXEC]  Modo cambiado a: {new_mode}")
     
     def on_test_selected(self, test_type):
         """Maneja selección de tipo de prueba"""
@@ -204,7 +204,7 @@ class TestExecutionView:
         # Actualizar timer con tiempo estimado
         self.timer_module.set_time(next_test["estimated_time"])
         
-        print(f"[TEST_EXEC] 🎯 Prueba seleccionada: {next_test['test_name']}")
+        print(f"[TEST_EXEC]  Prueba seleccionada: {next_test['test_name']}")
         print(f"  • Volumen: {next_test['volume']}L")
         print(f"  • Tiempo estimado: {next_test['time_formatted']}")
         
@@ -271,7 +271,7 @@ class TestExecutionView:
         self.test_buttons.set_testing_state(False)
         self.test_buttons.update_available_tests(self.get_remaining_tests())
         
-        print(f"[TEST_EXEC] ✅ Prueba finalizada. Total completadas: {len(self.completed_tests)}")
+        print(f"[TEST_EXEC]  Prueba finalizada. Total completadas: {len(self.completed_tests)}")
         
     def on_view_history(self):
         """Muestra el historial de pruebas"""
@@ -279,7 +279,7 @@ class TestExecutionView:
         
     def on_add_meter(self):
         """Agrega un nuevo medidor (función placeholder)"""
-        self.show_info("🔄 Funcionalidad de agregar medidor en desarrollo")
+        self.show_info(" Funcionalidad de agregar medidor en desarrollo")
         
     def on_end_session(self):
         """Termina la sesión de pruebas"""
@@ -387,7 +387,7 @@ class TestExecutionView:
         self.page.update()
 
     def get_configured_volumes(self):
-        """🔥 NUEVA FUNCIÓN: Obtiene los volúmenes configurados por tipo de prueba"""
+        """ NUEVA FUNCIÓN: Obtiene los volúmenes configurados por tipo de prueba"""
         volumes = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
         
         for config in self.test_configurations:
@@ -398,11 +398,11 @@ class TestExecutionView:
             if test_type in volumes and volumes[test_type] == 0:
                 volumes[test_type] = volume
         
-        print(f"[TEST_EXEC] 📦 Volúmenes configurados: {volumes}")
+        print(f"[TEST_EXEC]  Volúmenes configurados: {volumes}")
         return volumes
 
     def create_calculated_flows_display(self):
-        """🔥 MEJORADA: Crea el display de caudales y volúmenes en toda una fila"""
+        """ MEJORADA: Crea el display de caudales y volúmenes en toda una fila"""
         configured_volumes = self.get_configured_volumes()
         
         return ft.ResponsiveRow([
@@ -410,9 +410,9 @@ class TestExecutionView:
                 content=ft.Column([
                     ft.Text("Configuración de Pruebas", size=18, weight="bold", color=ft.Colors.BLUE_900, text_align="center"),
                     
-                    # 🔥 FILA PRINCIPAL CON DOS COLUMNAS
+                    #  FILA PRINCIPAL CON DOS COLUMNAS
                     ft.ResponsiveRow([
-                        # 🔥 COLUMNA 1: CAUDALES CALCULADOS
+                        #  COLUMNA 1: CAUDALES CALCULADOS
                         ft.Container(
                             content=ft.Column([
                                 ft.Text("Caudales Calculados (L/h)", size=14, weight="bold", color=ft.Colors.BLUE_700, text_align="center"),
@@ -463,10 +463,10 @@ class TestExecutionView:
                             padding=ft.padding.only(right=10),
                         ),
                         
-                        # 🔥 COLUMNA 2: VOLÚMENES CONFIGURADOS
+                        #  COLUMNA 2: VOLÚMENES CONFIGURADOS
                         ft.Container(
                             content=ft.Column([
-                                ft.Text("📦 Volúmenes Configurados (L)", size=14, weight="bold", color=ft.Colors.TEAL_700, text_align="center"),
+                                ft.Text(" Volúmenes Configurados (L)", size=14, weight="bold", color=ft.Colors.TEAL_700, text_align="center"),
                                 ft.ResponsiveRow([
                                     ft.Container(
                                         content=ft.Column([
@@ -543,7 +543,7 @@ class TestExecutionView:
                 border_radius=12,
                 border=ft.border.all(2, ft.Colors.BLUE_300),
                 bgcolor=ft.Colors.BLUE_50,
-                col=12,  # 🔥 OCUPA TODA LA FILA
+                col=12,  #  OCUPA TODA LA FILA
             )
         ])
 
@@ -579,57 +579,57 @@ class TestExecutionView:
         ], spacing=10)
         
     def build(self):
-        """🔥 MEJORADA: Construye la vista completa con debug del mode_selection"""
+        """ MEJORADA: Construye la vista completa con debug del mode_selection"""
         try:
             print("[TEST_EXEC] 🔨 Construyendo vista de ejecución...")
             
-            # 🔥 VERIFICAR QUE TODOS LOS MÓDULOS ESTÉN INICIALIZADOS
+            #  VERIFICAR QUE TODOS LOS MÓDULOS ESTÉN INICIALIZADOS
             required_modules = ['instant_values', 'timer_module', 'test_table', 'mode_selection', 'test_buttons', 'history_module']
             for module_name in required_modules:
                 if not hasattr(self, module_name):
-                    print(f"[TEST_EXEC] ❌ Módulo {module_name} no inicializado")
+                    print(f"[TEST_EXEC]  Módulo {module_name} no inicializado")
                     return ft.Container(
                         content=ft.Text(f"Error: Módulo {module_name} no disponible", color=ft.Colors.RED),
                         padding=20
                     )
                 else:
-                    print(f"[TEST_EXEC] ✅ Módulo {module_name} disponible")
+                    print(f"[TEST_EXEC]  Módulo {module_name} disponible")
             
-            # 🔥 CONSTRUIR TODOS LOS COMPONENTES CON DEBUG ESPECÍFICO
+            #  CONSTRUIR TODOS LOS COMPONENTES CON DEBUG ESPECÍFICO
             try:
-                # 🔥 VERIFICAR SI TIENE BUILD() O USAR DIRECTAMENTE
+                #  VERIFICAR SI TIENE BUILD() O USAR DIRECTAMENTE
                 if hasattr(self.instant_values, 'build'):
                     instant_values_build = self.instant_values.build()
                 else:
                     instant_values_build = self.instant_values
-                print("[TEST_EXEC] ✅ Valores instantáneos construidos")
+                print("[TEST_EXEC]  Valores instantáneos construidos")
             except Exception as e:
-                print(f"[TEST_EXEC] ❌ Error construyendo valores instantáneos: {e}")
+                print(f"[TEST_EXEC]  Error construyendo valores instantáneos: {e}")
                 instant_values_build = ft.Container(ft.Text("Error en valores instantáneos"), bgcolor=ft.Colors.RED_100)
             
             try:
-                # 🔥 VERIFICAR SI TIENE BUILD() O USAR DIRECTAMENTE
+                #  VERIFICAR SI TIENE BUILD() O USAR DIRECTAMENTE
                 if hasattr(self.test_table, 'build'):
                     test_table_build = self.test_table.build()
                 else:
                     test_table_build = self.test_table
-                print("[TEST_EXEC] ✅ Tabla de pruebas construida")
+                print("[TEST_EXEC]  Tabla de pruebas construida")
             except Exception as e:
-                print(f"[TEST_EXEC] ❌ Error construyendo tabla: {e}")
+                print(f"[TEST_EXEC]  Error construyendo tabla: {e}")
                 test_table_build = ft.Container(ft.Text("Error en tabla de pruebas"), bgcolor=ft.Colors.RED_100)
             
-            # 🔥 MODE_SELECTION - USAR DIRECTAMENTE (NO TIENE BUILD())
+            #  MODE_SELECTION - USAR DIRECTAMENTE (NO TIENE BUILD())
             try:
-                print(f"[TEST_EXEC] 🔍 Debug mode_selection:")
+                print(f"[TEST_EXEC]  Debug mode_selection:")
                 print(f"  • Tipo: {type(self.mode_selection)}")
                 print(f"  • Tiene build(): {hasattr(self.mode_selection, 'build')}")
                 
-                # 🔥 MODE_SELECTION RETORNA UN CONTAINER DIRECTAMENTE
+                #  MODE_SELECTION RETORNA UN CONTAINER DIRECTAMENTE
                 mode_selection_build = self.mode_selection
-                print(f"[TEST_EXEC] ✅ Mode selection usado directamente: {type(mode_selection_build)}")
+                print(f"[TEST_EXEC]  Mode selection usado directamente: {type(mode_selection_build)}")
                     
             except Exception as e:
-                print(f"[TEST_EXEC] ❌ Error construyendo selección de modo: {e}")
+                print(f"[TEST_EXEC]  Error construyendo selección de modo: {e}")
                 import traceback
                 traceback.print_exc()
                 mode_selection_build = ft.Container(
@@ -639,20 +639,20 @@ class TestExecutionView:
                 )
             
             try:
-                # 🔥 VERIFICAR SI TIENE BUILD() O USAR DIRECTAMENTE
+                #  VERIFICAR SI TIENE BUILD() O USAR DIRECTAMENTE
                 if hasattr(self.test_buttons, 'build'):
                     test_buttons_build = self.test_buttons.build()
                 else:
                     test_buttons_build = self.test_buttons
-                print("[TEST_EXEC] ✅ Botones de prueba construidos")
+                print("[TEST_EXEC]  Botones de prueba construidos")
             except Exception as e:
-                print(f"[TEST_EXEC] ❌ Error construyendo botones: {e}")
+                print(f"[TEST_EXEC]  Error construyendo botones: {e}")
                 test_buttons_build = ft.Container(ft.Text("Error en botones de prueba"), bgcolor=ft.Colors.RED_100)
             
-            # 🔥 CREAR LA ESTRUCTURA PRINCIPAL
+            #  CREAR LA ESTRUCTURA PRINCIPAL
             main_view = ft.Container(
                 content=ft.Column([
-                    # 🔥 TÍTULO CENTRADO RESPONSIVO
+                    #  TÍTULO CENTRADO RESPONSIVO
                     ft.Container(
                         content=ft.Text(
                             "Ejecución de Pruebas",
@@ -665,16 +665,16 @@ class TestExecutionView:
                         padding=ft.padding.only(bottom=20),
                     ),
                     
-                    # 🔥 FILA 1: MODE SELECTION (RESPONSIVA) - USAR DIRECTAMENTE
+                    #  FILA 1: MODE SELECTION (RESPONSIVA) - USAR DIRECTAMENTE
                     ft.ResponsiveRow([
                         ft.Container(
-                            content=mode_selection_build,  # 🔥 YA ES UN CONTAINER
+                            content=mode_selection_build,  #  YA ES UN CONTAINER
                             margin=ft.margin.only(bottom=15),
                             col=12,  # Ocupa toda la fila en cualquier tamaño
                         )
                     ]),
                     
-                    # 🔥 FILA 2: BOTONES DE PRUEBAS (RESPONSIVA)
+                    #  FILA 2: BOTONES DE PRUEBAS (RESPONSIVA)
                     ft.ResponsiveRow([
                         ft.Container(
                             content=test_buttons_build,
@@ -683,7 +683,7 @@ class TestExecutionView:
                         )
                     ]),
                     
-                    # 🔥 FILA 3: CONFIGURACIONES
+                    #  FILA 3: CONFIGURACIONES
                     ft.ResponsiveRow([
                         ft.Container(
                             content=self.create_calculated_flows_display(),
@@ -692,19 +692,19 @@ class TestExecutionView:
                         )
                     ]),
                     
-                    # 🔥 FILA 4: GRID PRINCIPAL RESPONSIVO
+                    #  FILA 4: GRID PRINCIPAL RESPONSIVO
                     ft.ResponsiveRow([
-                        # 🔥 COLUMNA 1: VALORES INSTANTÁNEOS
+                        #  COLUMNA 1: VALORES INSTANTÁNEOS
                         ft.Container(
                             content=instant_values_build,
                             col={"xs": 12, "md": 3},  # 100% en móvil, 25% en escritorio
                             padding=ft.padding.only(right=10),
                         ),
                         
-                        # 🔥 COLUMNA 2: ÁREA PRINCIPAL
+                        #  COLUMNA 2: ÁREA PRINCIPAL
                         ft.Container(
                             content=ft.Column([
-                                # 🔥 SUB-FILA: TABLA DE PRUEBAS
+                                #  SUB-FILA: TABLA DE PRUEBAS
                                 ft.Container(
                                     content=test_table_build,
                                     margin=ft.margin.only(top=15),
@@ -723,11 +723,11 @@ class TestExecutionView:
                 expand=True,
             )
             
-            print("[TEST_EXEC] ✅ Vista construida exitosamente")
+            print("[TEST_EXEC]  Vista construida exitosamente")
             return main_view
             
         except Exception as e:
-            print(f"[TEST_EXEC] ❌ Error crítico construyendo vista: {e}")
+            print(f"[TEST_EXEC]  Error crítico construyendo vista: {e}")
             import traceback
             traceback.print_exc()
             
@@ -748,15 +748,15 @@ class TestExecutionView:
             )
 
 def get_test_execution_view(page, test_data):
-    """🔥 MEJORADA: Función principal para obtener la vista de ejecución"""
+    """ MEJORADA: Función principal para obtener la vista de ejecución"""
     try:
-        print("[TEST_EXEC] 🚀 Creando vista de ejecución...")
+        print("[TEST_EXEC]  Creando vista de ejecución...")
         view = TestExecutionView(page, test_data)
         built_view = view.build()
-        print("[TEST_EXEC] ✅ Vista de ejecución creada exitosamente")
+        print("[TEST_EXEC]  Vista de ejecución creada exitosamente")
         return built_view
     except Exception as e:
-        print(f"[TEST_EXEC] ❌ Error creando vista: {e}")
+        print(f"[TEST_EXEC]  Error creando vista: {e}")
         import traceback
         traceback.print_exc()
         

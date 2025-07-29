@@ -55,7 +55,7 @@ class ModbusSimulator:
         for i in range(262, 270):
             self.coil_states[i] = False
             
-        print("✅ Valores por defecto inicializados")
+        print(" Valores por defecto inicializados")
 
     def float_to_registers(self, value):
         """Convierte float a 2 registros (little_word format)"""
@@ -100,8 +100,8 @@ class ModbusSimulator:
                     new_val = old_val + increment
                     self.holding_registers[reg_addr] = self.float_to_registers(new_val)
                     
-                    # 🔥 LOG para debugging
-                    print(f"[SIMULATOR] 📊 Volumen Q{i+1}: {old_val:.2f} → {new_val:.2f}")
+                    #  LOG para debugging
+                    print(f"[SIMULATOR]  Volumen Q{i+1}: {old_val:.2f} → {new_val:.2f}")
 
     def handle_read_holding_registers(self, start_addr, quantity):
         """Función 3: Leer registros de retención"""
@@ -178,7 +178,7 @@ class ModbusSimulator:
                 for fc_num in fc_mapping[button_addr]:
                     fc_addr = 277 + fc_num
                     self.coil_states[fc_addr] = True
-                    print(f"✅ FC{fc_num} (M{fc_addr}) activado")
+                    print(f" FC{fc_num} (M{fc_addr}) activado")
                     time.sleep(0.5)  # Simular tiempo entre activaciones
                     
                     # Desactivar después de un tiempo
@@ -204,7 +204,7 @@ class ModbusSimulator:
         hex_string = ''.join(f'{b:02X}' for b in response_data) + f'{lrc:02X}'
         return f":{hex_string}\r\n"
 
-    # 🔥 NUEVA FUNCIÓN PARA SEPARAR COMANDOS MÚLTIPLES
+    #  NUEVA FUNCIÓN PARA SEPARAR COMANDOS MÚLTIPLES
     def extract_commands(self, raw_data):
         """Extrae comandos individuales de datos concatenados"""
         self.command_buffer += raw_data
@@ -250,9 +250,9 @@ class ModbusSimulator:
                 
             hex_data = clean_command[1:-2]  # Quitar ':' y LRC (últimos 2 chars)
             
-            # 🔥 VERIFICAR QUE SOLO CONTIENE CARACTERES HEX VÁLIDOS
+            #  VERIFICAR QUE SOLO CONTIENE CARACTERES HEX VÁLIDOS
             if not all(c in '0123456789ABCDEFabcdef' for c in hex_data):
-                print(f"❌ Comando contiene caracteres no hexadecimales: {hex_data}")
+                print(f" Comando contiene caracteres no hexadecimales: {hex_data}")
                 return None
                 
             data_bytes = bytes.fromhex(hex_data)
@@ -326,7 +326,7 @@ class ModbusSimulator:
                     }
                     
         except Exception as e:
-            print(f"❌ Error parseando comando '{command}': {e}")
+            print(f" Error parseando comando '{command}': {e}")
             return None
 
     def process_command(self, parsed_cmd):
@@ -346,16 +346,16 @@ class ModbusSimulator:
                 byte_count = len(data) * 2
                 data_bytes = [byte_count] + self.registers_to_bytes(data)
                 
-                # 🔥 LOG ESPECIAL PARA VOLÚMENES INSTANTÁNEOS
+                #  LOG ESPECIAL PARA VOLÚMENES INSTANTÁNEOS
                 if parsed_cmd['start_addr'] == 150 and parsed_cmd['quantity'] == 4:
-                    print(f"[SIMULATOR] 📊 Enviando volúmenes instantáneos:")
+                    print(f"[SIMULATOR]  Enviando volúmenes instantáneos:")
                     for i in range(4):
                         addr = 150 + (i * 2)
                         if addr in self.holding_registers:
                             vol_data = self.holding_registers[addr]
                             if isinstance(vol_data, list):
                                 val = struct.unpack('>f', struct.pack('>HH', vol_data[1], vol_data[0]))[0]
-                                print(f"  📊 Q{i+1} Volume: {val:.2f}")
+                                print(f"   Q{i+1} Volume: {val:.2f}")
                 
                 return self.create_response(slave, function, data_bytes)
                 
@@ -412,7 +412,7 @@ class ModbusSimulator:
                     return self.create_response(slave, function, data_bytes)
                     
         except Exception as e:
-            print(f"❌ Error procesando comando: {e}")
+            print(f" Error procesando comando: {e}")
             
         return ":010182B6\r\n"  # Error response por defecto
 
@@ -428,8 +428,8 @@ def run_simulator():
             stopbits=serial.STOPBITS_ONE,
             timeout=1
         )
-        print(f"✅ COM Simulator activo en {SIMULATED_PORT}")
-        print("📊 Simulando datos en tiempo real...")
+        print(f" COM Simulator activo en {SIMULATED_PORT}")
+        print(" Simulando datos en tiempo real...")
         
         last_dynamic_update = time.time()
         
@@ -447,7 +447,7 @@ def run_simulator():
 
                 print(f"📥 Datos brutos recibidos: {repr(raw_data)}")
                 
-                # 🔥 EXTRAER COMANDOS INDIVIDUALES
+                #  EXTRAER COMANDOS INDIVIDUALES
                 commands = simulator.extract_commands(raw_data)
                 
                 for command in commands:
@@ -464,11 +464,11 @@ def run_simulator():
             time.sleep(0.05)
 
     except Exception as e:
-        print(f"❌ Error en simulador: {e}")
+        print(f" Error en simulador: {e}")
 
 if __name__ == "__main__":
-    print("🚀 Iniciando simulador COM mejorado...")
-    print("📋 Funciones simuladas:")
+    print(" Iniciando simulador COM mejorado...")
+    print(" Funciones simuladas:")
     print("   - Lectura de caudales instantáneos (D136-D141)")
     print("   - Lectura de volúmenes instantáneos (D150-D157)")
     print("   - Lectura/escritura de valores de prueba")

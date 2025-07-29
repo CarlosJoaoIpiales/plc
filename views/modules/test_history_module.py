@@ -40,7 +40,7 @@ class TestHistoryModule:
                         ft.DataCell(ft.Text(f"{test.get('error_percentage', 0):.2f}%", size=12)),
                         ft.DataCell(
                             ft.Text(
-                                "✅ APROBADO" if test.get("is_passed", False) else "❌ REPROBADO", 
+                                " APROBADO" if test.get("is_passed", False) else " REPROBADO", 
                                 size=12,
                                 color=result_color,
                                 weight="bold"
@@ -72,7 +72,7 @@ class TestHistoryModule:
             stats = ft.Container(
                 content=ft.Row([
                     ft.Column([
-                        ft.Text("📊 Estadísticas", size=14, weight="bold"),
+                        ft.Text(" Estadísticas", size=14, weight="bold"),
                         ft.Text(f"Total: {total_tests}", size=12),
                         ft.Text(f"Aprobadas: {passed_tests}", size=12, color=ft.Colors.GREEN),
                         ft.Text(f"Reprobadas: {total_tests - passed_tests}", size=12, color=ft.Colors.RED),
@@ -96,7 +96,7 @@ class TestHistoryModule:
             ])
             
         dialog = ft.AlertDialog(
-            title=ft.Text("📋 Historial de Pruebas"),
+            title=ft.Text(" Historial de Pruebas"),
             content=ft.Container(
                 content=content,
                 width=700,

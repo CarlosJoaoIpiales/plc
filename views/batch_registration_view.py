@@ -8,6 +8,7 @@ from utils.address_utils import get_address
 from services.modbus_service import ModbusService
 import time
 import threading
+from views.modules.meter_table_module import create_meter_table_module
 
 RATIO_OPTIONS = ["80", "100", "160", "250", "400"]
 DIAMETER_OPTIONS = ["15", "20", "25", "32", "40", "50"]
@@ -18,8 +19,11 @@ def get_batch_registration_view(page, on_continue):
 
     calculated_flows = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
 
-    # 🔥 CREAR LA TABLA DE CONFIGURACIÓN DE PRUEBAS
+    #  CREAR LA TABLA DE CONFIGURACIÓN DE PRUEBAS
     config_table = test_configuration_table()
+
+    meter_table = create_meter_table_module()
+
 
     client_dropdown = ft.Dropdown(
         label="Cliente",
@@ -55,13 +59,13 @@ def get_batch_registration_view(page, on_continue):
         expand=True
     )
 
-    # 🔥 RADIOBUTTON PARA SELECCIÓN DE MODO
+    #  RADIOBUTTON PARA SELECCIÓN DE MODO
     operation_mode = ft.RadioGroup(
         content=ft.Row([
             ft.Radio(value="manual", label="Modo Manual"),
             ft.Radio(value="automatic", label="Modo Automático"),
         ]),
-        value="automatic"  # 🔥 VALOR POR DEFECTO
+        value="automatic"  #  VALOR POR DEFECTO
     )
 
     # --- Popups para cliente/técnico ---
@@ -78,9 +82,9 @@ def get_batch_registration_view(page, on_continue):
                 return
                 
             R = float(ratio.value)  # Ratio
-            Q3 = float(nominal_flow.value)  # 🔥 YA ESTÁ EN L/H, NO CONVERTIR
+            Q3 = float(nominal_flow.value)  #  YA ESTÁ EN L/H, NO CONVERTIR
             
-            # 🔥 FÓRMULAS DE CÁLCULO
+            #  FÓRMULAS DE CÁLCULO
             Q1 = Q3 / R
             Q2 = Q1 * 1.6
             Q4 = Q3 * 1.25
@@ -90,14 +94,14 @@ def get_batch_registration_view(page, on_continue):
             calculated_flows["Q3"] = round(Q3, 2)
             calculated_flows["Q4"] = round(Q4, 2)
             
-            print(f"[BATCH_REG] 🧮 Caudales calculados: Q1={Q1:.2f}, Q2={Q2:.2f}, Q3={Q3:.2f}, Q4={Q4:.2f}")
+            print(f"[BATCH_REG]  Caudales calculados: Q1={Q1:.2f}, Q2={Q2:.2f}, Q3={Q3:.2f}, Q4={Q4:.2f}")
             
-            # 🔥 ACTUALIZAR LA TABLA CON LOS NUEVOS VALORES
+            #  ACTUALIZAR LA TABLA CON LOS NUEVOS VALORES
             if hasattr(config_table, 'update_flow_values'):
                 config_table.update_flow_values(Q1, Q2, Q3, Q4)
             
         except ValueError as e:
-            print(f"[BATCH_REG] ❌ Error calculando caudales: {e}")
+            print(f"[BATCH_REG]  Error calculando caudales: {e}")
             calculated_flows.update({"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0})
 
     def client_name_on_change(e):
@@ -125,7 +129,7 @@ def get_batch_registration_view(page, on_continue):
         address = client_address_field.value.strip()
         email = client_email_field.value.strip()
         
-        # 🔥 VALIDACIONES
+        #  VALIDACIONES
         if not is_valid_name(name):
             client_error.value = "Nombre inválido (solo letras y espacios, mayúsculas, sin caracteres especiales)"
             page.update()
@@ -140,7 +144,7 @@ def get_batch_registration_view(page, on_continue):
             return
         
         try:
-            # 🔥 SOLUCIÓN: CREAR DICCIONARIO CON TODOS LOS DATOS
+            #  SOLUCIÓN: CREAR DICCIONARIO CON TODOS LOS DATOS
             client_data = {
                 "name": name,
                 "phone": phone,
@@ -149,21 +153,21 @@ def get_batch_registration_view(page, on_continue):
             }
             
             print(f"[CLIENT] 💾 Guardando cliente completo: {client_data}")
-            add_client(client_data)  # 🔥 ENVIAR DICCIONARIO COMPLETO
+            add_client(client_data)  #  ENVIAR DICCIONARIO COMPLETO
             
-            # 🔥 ACTUALIZAR DROPDOWN CON NUEVA LISTA
+            #  ACTUALIZAR DROPDOWN CON NUEVA LISTA
             updated_clients = get_all_clients()
             client_dropdown.options = [ft.dropdown.Option(c["name"]) for c in updated_clients] + [ft.dropdown.Option("Agregar nuevo...")]
             client_dropdown.value = name
             
-            # 🔥 CERRAR DIÁLOGO
+            #  CERRAR DIÁLOGO
             page.dialog.open = False
             page.update()
             
-            print(f"[CLIENT] ✅ Cliente '{name}' guardado exitosamente con todos los datos")
+            print(f"[CLIENT]  Cliente '{name}' guardado exitosamente con todos los datos")
             
         except Exception as ex:
-            print(f"[CLIENT] ❌ Error guardando cliente: {ex}")
+            print(f"[CLIENT]  Error guardando cliente: {ex}")
             client_error.value = f"Error guardando cliente: {str(ex)}"
             page.update()
 
@@ -212,23 +216,23 @@ def get_batch_registration_view(page, on_continue):
             return
         
         try:
-            # 🔥 CORECCIÓN: PASAR SOLO EL NOMBRE, NO EL DICCIONARIO COMPLETO
+            #  CORECCIÓN: PASAR SOLO EL NOMBRE, NO EL DICCIONARIO COMPLETO
             print(f"[TECHNICIAN] 💾 Guardando técnico: {name}")
-            add_technician(name)  # 🔥 SOLO EL NOMBRE COMO STRING
+            add_technician(name)  #  SOLO EL NOMBRE COMO STRING
             
-            # 🔥 ACTUALIZAR DROPDOWN CON NUEVA LISTA
+            #  ACTUALIZAR DROPDOWN CON NUEVA LISTA
             updated_technicians = get_all_technicians()
             technician_dropdown.options = [ft.dropdown.Option(t["name"]) for t in updated_technicians] + [ft.dropdown.Option("Agregar nuevo...")]
             technician_dropdown.value = name
             
-            # 🔥 CERRAR DIÁLOGO
+            #  CERRAR DIÁLOGO
             page.dialog.open = False
             page.update()
             
-            print(f"[TECHNICIAN] ✅ Técnico '{name}' guardado exitosamente")
+            print(f"[TECHNICIAN]  Técnico '{name}' guardado exitosamente")
             
         except Exception as ex:
-            print(f"[TECHNICIAN] ❌ Error guardando técnico: {ex}")
+            print(f"[TECHNICIAN]  Error guardando técnico: {ex}")
             technician_error.value = f"Error guardando técnico: {str(ex)}"
             page.update()
 
@@ -301,19 +305,19 @@ def get_batch_registration_view(page, on_continue):
             
             service = ModbusService()
             service.send_command(comand_on)
-            time.sleep(0.1)  # 🔥 PAUSA ENTRE COMANDOS
+            time.sleep(0.1)  #  PAUSA ENTRE COMANDOS
             service.send_command(comand_off)
-            print(f"[MODBUS] ✅ Bit M{bit} activado/desactivado correctamente")
+            print(f"[MODBUS]  Bit M{bit} activado/desactivado correctamente")
             return True
             
         except Exception as ex:
-            print(f"[MODBUS] ❌ Error al enviar a M{bit}: {ex}")
+            print(f"[MODBUS]  Error al enviar a M{bit}: {ex}")
             return False
 
     def send_to_plc_register(address, value, value_type="int"):
         """Envía un valor al PLC en una dirección determinada"""
         try:
-            # 🔥 EXTRAER NÚMERO DE DIRECCIÓN (D122 -> 122)
+            #  EXTRAER NÚMERO DE DIRECCIÓN (D122 -> 122)
             if isinstance(address, str) and address.startswith('D'):
                 address_num = int(address[1:])
             else:
@@ -321,7 +325,7 @@ def get_batch_registration_view(page, on_continue):
                 
             info = get_address('D', address_num)
             if not isinstance(info, dict):
-                print(f"[MODBUS] ❌ Dirección inválida: D{address_num}")
+                print(f"[MODBUS]  Dirección inválida: D{address_num}")
                 return False
 
             quantity = 1 if value_type == "int" else 2
@@ -340,11 +344,11 @@ def get_batch_registration_view(page, on_continue):
             
             service = ModbusService()
             service.send_command(command)
-            print(f"[MODBUS] ✅ Escribiendo D{address_num}: {value} ({command.strip()})")
+            print(f"[MODBUS]  Escribiendo D{address_num}: {value} ({command.strip()})")
             return True
             
         except Exception as ex:
-            print(f"[MODBUS] ❌ Error al enviar D{address_num}: {ex}")
+            print(f"[MODBUS]  Error al enviar D{address_num}: {ex}")
             return False
 
     ratio.on_change = on_ratio_change
@@ -356,17 +360,17 @@ def get_batch_registration_view(page, on_continue):
 
     macro_error = ft.Text("", color="red")
 
-    # 🔥 FUNCIÓN PARA ENVIAR DATOS AL PLC
+    #  FUNCIÓN PARA ENVIAR DATOS AL PLC
     def send_data_to_plc_sync(mode, meter_data, calculated_flows, test_configs):
         """Envía datos al PLC según el modo seleccionado con logging detallado - VERSIÓN SÍNCRONA"""
         try:
-            print(f"[PLC_COMM] 📡 Iniciando envío de datos al PLC en modo: {mode}")
+            print(f"[PLC_COMM]  Iniciando envío de datos al PLC en modo: {mode}")
             
             success_count = 0
             total_operations = 0
-            operation_log = []  # 🔥 LOG DETALLADO DE OPERACIONES
+            operation_log = []  #  LOG DETALLADO DE OPERACIONES
 
-            # 🔥 PASO 1: ENVIAR COMANDO DE MODO
+            #  PASO 1: ENVIAR COMANDO DE MODO
             total_operations += 1
             operation_log.append(f"[{total_operations}] Enviando modo de operación...")
             
@@ -374,25 +378,25 @@ def get_batch_registration_view(page, on_continue):
                 print(f"[PLC_COMM] 🔧 Enviando comando: Modo Manual (bit M272)")
                 if send_bool_m(272):
                     success_count += 1
-                    operation_log.append(f"[{total_operations}] ✅ Modo Manual activado correctamente")
+                    operation_log.append(f"[{total_operations}]  Modo Manual activado correctamente")
                 else:
-                    operation_log.append(f"[{total_operations}] ❌ Error activando Modo Manual")
+                    operation_log.append(f"[{total_operations}]  Error activando Modo Manual")
             else:
                 print(f"[PLC_COMM] 🤖 Enviando comando: Modo Automático (bit M271)")
                 if send_bool_m(271):
                     success_count += 1
-                    operation_log.append(f"[{total_operations}] ✅ Modo Automático activado correctamente")
+                    operation_log.append(f"[{total_operations}]  Modo Automático activado correctamente")
                 else:
-                    operation_log.append(f"[{total_operations}] ❌ Error activando Modo Automático")
+                    operation_log.append(f"[{total_operations}]  Error activando Modo Automático")
 
-            # 🔥 PEQUEÑA PAUSA PARA QUE EL USUARIO VEA EL PROGRESO
+            #  PEQUEÑA PAUSA PARA QUE EL USUARIO VEA EL PROGRESO
             time.sleep(0.5)
 
-            # 🔥 PASO 2: ENVIAR DATOS DE CONFIGURACIÓN
+            #  PASO 2: ENVIAR DATOS DE CONFIGURACIÓN
             ratio_value = int(meter_data["ratio"])
             q3_nominal = float(meter_data["nominal_flow"])
 
-            print(f"[PLC_COMM] 📊 Enviando configuración del medidor:")
+            print(f"[PLC_COMM]  Enviando configuración del medidor:")
             print(f"  • Ratio: {ratio_value}")
             print(f"  • Q3 (Nominal): {q3_nominal} L/h")
 
@@ -401,28 +405,28 @@ def get_batch_registration_view(page, on_continue):
             operation_log.append(f"[{total_operations}] Enviando ratio: {ratio_value}")
             if send_to_plc_register("D122", ratio_value, "int"):
                 success_count += 1
-                operation_log.append(f"[{total_operations}] ✅ Ratio enviado a D122")
-                print(f"[PLC_COMM] ✅ Ratio enviado a D122")
+                operation_log.append(f"[{total_operations}]  Ratio enviado a D122")
+                print(f"[PLC_COMM]  Ratio enviado a D122")
             else:
-                operation_log.append(f"[{total_operations}] ❌ Error enviando ratio a D122")
-                print(f"[PLC_COMM] ❌ Error enviando ratio")
+                operation_log.append(f"[{total_operations}]  Error enviando ratio a D122")
+                print(f"[PLC_COMM]  Error enviando ratio")
 
-            time.sleep(0.3)  # 🔥 PAUSA VISUAL
+            time.sleep(0.3)  #  PAUSA VISUAL
 
             # Enviar caudal nominal
             total_operations += 1
             operation_log.append(f"[{total_operations}] Enviando Q3 nominal: {q3_nominal} L/h")
             if send_to_plc_register("D144", q3_nominal, "float"):
                 success_count += 1
-                operation_log.append(f"[{total_operations}] ✅ Q3 nominal enviado a D144")
-                print(f"[PLC_COMM] ✅ Q3 nominal enviado a D144")
+                operation_log.append(f"[{total_operations}]  Q3 nominal enviado a D144")
+                print(f"[PLC_COMM]  Q3 nominal enviado a D144")
             else:
-                operation_log.append(f"[{total_operations}] ❌ Error enviando Q3 nominal a D144")
-                print(f"[PLC_COMM] ❌ Error enviando Q3 nominal")
+                operation_log.append(f"[{total_operations}]  Error enviando Q3 nominal a D144")
+                print(f"[PLC_COMM]  Error enviando Q3 nominal")
 
-            time.sleep(0.3)  # 🔥 PAUSA VISUAL
+            time.sleep(0.3)  #  PAUSA VISUAL
 
-            # 🔥 PASO 3: ENVIAR VOLÚMENES DE PRUEBAS
+            #  PASO 3: ENVIAR VOLÚMENES DE PRUEBAS
             test_address_map = {
                 "Q1": "D118",
                 "Q2": "D116", 
@@ -439,7 +443,7 @@ def get_batch_registration_view(page, on_continue):
                     volume_map[test_type] = []
                 volume_map[test_type].append(volume)
 
-            print(f"[PLC_COMM] 📦 Enviando volúmenes de prueba:")
+            print(f"[PLC_COMM]  Enviando volúmenes de prueba:")
             for test_type, address in test_address_map.items():
                 total_operations += 1
                 
@@ -447,31 +451,31 @@ def get_batch_registration_view(page, on_continue):
                     # Si hay múltiples volúmenes, enviar el primero
                     volume = volume_map[test_type][0]
                     operation_log.append(f"[{total_operations}] Enviando volumen {test_type}: {volume}L → {address}")
-                    print(f"[PLC_COMM] 📦 Enviando volumen para {test_type}: {volume} L a {address}")
+                    print(f"[PLC_COMM]  Enviando volumen para {test_type}: {volume} L a {address}")
                     if send_to_plc_register(address, volume, "int"):
                         success_count += 1
-                        operation_log.append(f"[{total_operations}] ✅ Volumen {test_type} enviado correctamente")
+                        operation_log.append(f"[{total_operations}]  Volumen {test_type} enviado correctamente")
                     else:
-                        operation_log.append(f"[{total_operations}] ❌ Error enviando volumen {test_type}")
+                        operation_log.append(f"[{total_operations}]  Error enviando volumen {test_type}")
                 else:
                     # Si no hay volumen definido, enviar 0
                     operation_log.append(f"[{total_operations}] Enviando volumen {test_type}: 0L → {address} (no configurado)")
-                    print(f"[PLC_COMM] 📦 Enviando volumen para {test_type}: 0 L a {address} (no configurado)")
+                    print(f"[PLC_COMM]  Enviando volumen para {test_type}: 0 L a {address} (no configurado)")
                     if send_to_plc_register(address, 0, "int"):
                         success_count += 1
-                        operation_log.append(f"[{total_operations}] ✅ Volumen {test_type} (0L) enviado correctamente")
+                        operation_log.append(f"[{total_operations}]  Volumen {test_type} (0L) enviado correctamente")
                     else:
-                        operation_log.append(f"[{total_operations}] ❌ Error enviando volumen {test_type} (0L)")
+                        operation_log.append(f"[{total_operations}]  Error enviando volumen {test_type} (0L)")
                 
-                time.sleep(0.2)  # 🔥 PAUSA ENTRE COMANDOS
+                time.sleep(0.2)  #  PAUSA ENTRE COMANDOS
 
-            # 🔥 MOSTRAR RESUMEN COMPLETO
-            print(f"[PLC_COMM] 📊 Resumen de envío:")
+            #  MOSTRAR RESUMEN COMPLETO
+            print(f"[PLC_COMM]  Resumen de envío:")
             print(f"  • Operaciones exitosas: {success_count}/{total_operations}")
             print(f"  • Porcentaje de éxito: {(success_count/total_operations)*100:.1f}%")
             
-            # 🔥 MOSTRAR LOG DETALLADO
-            print(f"[PLC_COMM] 📋 Log detallado de operaciones:")
+            #  MOSTRAR LOG DETALLADO
+            print(f"[PLC_COMM]  Log detallado de operaciones:")
             for log_entry in operation_log:
                 print(f"  {log_entry}")
 
@@ -479,14 +483,14 @@ def get_batch_registration_view(page, on_continue):
             is_success = (success_count / total_operations) >= 0.8
             
             if is_success:
-                print(f"[PLC_COMM] ✅ Envío completado exitosamente")
+                print(f"[PLC_COMM]  Envío completado exitosamente")
             else:
-                print(f"[PLC_COMM] ⚠️ Envío completado con errores")
+                print(f"[PLC_COMM]  Envío completado con errores")
                 
             return is_success
 
         except Exception as e:
-            print(f"[PLC_COMM] ❌ Error crítico enviando datos al PLC: {e}")
+            print(f"[PLC_COMM]  Error crítico enviando datos al PLC: {e}")
             return False
 
     def validate_and_continue(e):
@@ -494,7 +498,7 @@ def get_batch_registration_view(page, on_continue):
         client_name = client_dropdown.value
         technician_name = technician_dropdown.value
 
-        # 🔥 VALIDACIÓN GRUPO 1: DATOS DE MEDIDORES
+        #  VALIDACIÓN GRUPO 1: DATOS DE MEDIDORES
         if not client_name or client_name == "Agregar nuevo...":
             macro_error.value = "Por favor selecciona o agrega un cliente."
             page.update()
@@ -518,19 +522,19 @@ def get_batch_registration_view(page, on_continue):
             page.update()
             return
 
-        # 🔥 VALIDACIÓN GRUPO 2: MODELO DE ENSAYO
+        #  VALIDACIÓN GRUPO 2: MODELO DE ENSAYO
         errors, valid_configs = config_table.validate_configurations()
         
         if errors:
             # Mostrar errores de configuración en diálogo
-            error_text = "❌ Errores en la configuración de pruebas:\n\n" + "\n".join(errors)
+            error_text = " Errores en la configuración de pruebas:\n\n" + "\n".join(errors)
             
             def close_error_dialog(e):
                 error_dialog.open = False
                 page.update()
             
             error_dialog = ft.AlertDialog(
-                title=ft.Text("❌ Configuración de Pruebas Inválida"),
+                title=ft.Text(" Configuración de Pruebas Inválida"),
                 content=ft.Text(error_text),
                 actions=[ft.TextButton("Corregir", on_click=close_error_dialog)],
             )
@@ -540,17 +544,17 @@ def get_batch_registration_view(page, on_continue):
             page.update()
             return
 
-        # 🔥 VALIDACIÓN GRUPO 3: MODO DE OPERACIÓN
+        #  VALIDACIÓN GRUPO 3: MODO DE OPERACIÓN
         if not operation_mode.value:
             macro_error.value = "Por favor selecciona un modo de operación."
             page.update()
             return
 
-        # 🔥 SI TODO ES VÁLIDO, OBTENER CONFIGURACIONES Y CONTINUAR
+        #  SI TODO ES VÁLIDO, OBTENER CONFIGURACIONES Y CONTINUAR
         test_configurations = config_table.get_test_configurations()
         selected_mode = operation_mode.value
-        print(f"[BATCH_REG] ✅ Configuraciones válidas: {len(test_configurations)} pruebas")
-        print(f"[BATCH_REG] 🎯 Modo seleccionado: {selected_mode}")
+        print(f"[BATCH_REG]  Configuraciones válidas: {len(test_configurations)} pruebas")
+        print(f"[BATCH_REG]  Modo seleccionado: {selected_mode}")
         
         # Guardar configuraciones en la sesión
         page.session.set("test_configurations", test_configurations)
@@ -571,20 +575,20 @@ def get_batch_registration_view(page, on_continue):
         }
         
         # Mostrar confirmación con el modo seleccionado
-        config_summary = "📋 Resumen de configuración:\n\n"
-        config_summary += f"🎯 Modo de operación: {selected_mode.upper()}\n\n"
+        config_summary = " Resumen de configuración:\n\n"
+        config_summary += f" Modo de operación: {selected_mode.upper()}\n\n"
         config_summary += f"🔧 Datos del medidor:\n"
         config_summary += f"  • Marca: {brand.value}\n"
         config_summary += f"  • Modelo: {model.value}\n"
         config_summary += f"  • Ratio: {ratio.value}\n"
         config_summary += f"  • Caudal Nominal (Q3): {nominal_flow.value} L/h\n"
         config_summary += f"  • Diámetro: {diameter.value} mm\n\n"
-        config_summary += f"📊 Caudales calculados:\n"
+        config_summary += f" Caudales calculados:\n"
         config_summary += f"  • Q1: {calculated_flows['Q1']:.2f} L/h\n"
         config_summary += f"  • Q2: {calculated_flows['Q2']:.2f} L/h\n"
         config_summary += f"  • Q3: {calculated_flows['Q3']:.2f} L/h\n"
         config_summary += f"  • Q4: {calculated_flows['Q4']:.2f} L/h\n\n"
-        config_summary += f"📋 Total de pruebas: {len(test_configurations)}\n"
+        config_summary += f" Total de pruebas: {len(test_configurations)}\n"
         config_summary += f"🔬 Tipos de prueba: {', '.join(set(c['test_type'] for c in test_configurations))}\n\n"
         config_summary += "Secuencia de pruebas:\n"
         for i, config in enumerate(test_configurations, 1):
@@ -593,7 +597,7 @@ def get_batch_registration_view(page, on_continue):
                 config_summary += f" (Rep. {config['repetition']}/{config['total_repetitions']})"
             config_summary += f" - Vol: {config['volume']:.2f}L, Tiempo: {config['time_formatted']}\n"
 
-        # 🔥 ELEMENTOS DEL DIÁLOGO DE PROGRESO
+        #  ELEMENTOS DEL DIÁLOGO DE PROGRESO
         progress_ring = ft.ProgressRing(width=50, height=50, stroke_width=4)
         progress_text = ft.Text("Enviando datos al PLC...", size=16, text_align="center")
         progress_details = ft.Text("Iniciando comunicación...", size=12, text_align="center", color=ft.Colors.GREY_600)
@@ -603,7 +607,7 @@ def get_batch_registration_view(page, on_continue):
             confirm_dialog.open = False
             page.update()
             
-            # 🔥 GUARDAR TODOS LOS DATOS EN LA PÁGINA PARA ACCESO POSTERIOR
+            #  GUARDAR TODOS LOS DATOS EN LA PÁGINA PARA ACCESO POSTERIOR
             page.client_name = client_name
             page.technician_name = technician_name
             page.brand = brand.value
@@ -625,7 +629,7 @@ def get_batch_registration_view(page, on_continue):
             print(f"  • Tipo: {meter_type.value}")
             print(f"  • Batch: {batch.value}")
             
-            # 🔥 TAMBIÉN GUARDAR EN SESSION COMO RESPALDO
+            #  TAMBIÉN GUARDAR EN SESSION COMO RESPALDO
             try:
                 page.session.set("client_name", client_name)
                 page.session.set("technician_name", technician_name)
@@ -640,16 +644,16 @@ def get_batch_registration_view(page, on_continue):
             except Exception as session_error:
                 print(f"[BATCH_REG] ⚠️ Error guardando en session: {session_error}")
             
-            # 🔥 ELEMENTOS DEL DIÁLOGO DE PROGRESO MEJORADOS
+            #  ELEMENTOS DEL DIÁLOGO DE PROGRESO MEJORADOS
             progress_ring = ft.ProgressRing(width=60, height=60, stroke_width=6, color=ft.Colors.BLUE_600)
             progress_text = ft.Text("Iniciando comunicación con PLC...", size=16, text_align="center", weight="bold")
             progress_details = ft.Text("Preparando datos...", size=12, text_align="center", color=ft.Colors.GREY_600)
             progress_percentage = ft.Text("0%", size=20, text_align="center", weight="bold", color=ft.Colors.BLUE_700)
             
-            # 🔥 BARRA DE PROGRESO ADICIONAL
+            #  BARRA DE PROGRESO ADICIONAL
             progress_bar = ft.ProgressBar(width=280, height=8, bgcolor=ft.Colors.GREY_300, color=ft.Colors.BLUE_600, value=0)
             
-            # 🔥 LISTA DE PASOS COMPLETADOS
+            #  LISTA DE PASOS COMPLETADOS
             steps_column = ft.Column([], spacing=5, height=150, scroll=ft.ScrollMode.AUTO)
             
             def add_step_indicator(step_text, status="progress"):
@@ -673,9 +677,9 @@ def get_batch_registration_view(page, on_continue):
                 ], spacing=8)
                 
                 steps_column.controls.append(step_row)
-                page.update()  # 🔥 ACTUALIZAR INMEDIATAMENTE
+                page.update()  #  ACTUALIZAR INMEDIATAMENTE
             
-            # 🔥 MOSTRAR DIÁLOGO DE PROGRESO MEJORADO
+            #  MOSTRAR DIÁLOGO DE PROGRESO MEJORADO
             progress_dialog = ft.AlertDialog(
                 modal=True,
                 title=ft.Row([
@@ -684,7 +688,7 @@ def get_batch_registration_view(page, on_continue):
                 ]),
                 content=ft.Container(
                     content=ft.Column([
-                        # 🔥 PROGRESO VISUAL
+                        #  PROGRESO VISUAL
                         ft.Container(
                             content=ft.Stack([
                                 progress_ring,
@@ -697,16 +701,16 @@ def get_batch_registration_view(page, on_continue):
                             height=80,
                         ),
                         
-                        # 🔥 TEXTO DE ESTADO
+                        #  TEXTO DE ESTADO
                         progress_text,
                         progress_details,
                         
-                        # 🔥 BARRA DE PROGRESO
+                        #  BARRA DE PROGRESO
                         progress_bar,
                         
                         ft.Divider(height=10),
                         
-                        # 🔥 PASOS DETALLADOS
+                        #  PASOS DETALLADOS
                         ft.Container(
                             content=ft.Column([
                                 ft.Text("Progreso detallado:", size=12, weight="bold", color=ft.Colors.GREY_700),
@@ -726,12 +730,12 @@ def get_batch_registration_view(page, on_continue):
                 ),
             )
             
-            # 🔥 MOSTRAR EL DIÁLOGO INMEDIATAMENTE
+            #  MOSTRAR EL DIÁLOGO INMEDIATAMENTE
             page.overlay.append(progress_dialog)
             progress_dialog.open = True
             page.update()
             
-            # 🔥 FUNCIÓN PARA ACTUALIZAR PROGRESO CON FORZAR UPDATE
+            #  FUNCIÓN PARA ACTUALIZAR PROGRESO CON FORZAR UPDATE
             def update_progress(step_text, detail_text="", percentage=0):
                 # Actualizar elementos visuales
                 progress_text.value = step_text
@@ -742,11 +746,11 @@ def get_batch_registration_view(page, on_continue):
                 # Agregar paso a la lista
                 add_step_indicator(f"{step_text}", "progress")
                 
-                # 🔥 FORZAR ACTUALIZACIÓN INMEDIATA
+                #  FORZAR ACTUALIZACIÓN INMEDIATA
                 page.update()
                 
-                # 🔥 SLEEP PARA QUE EL USUARIO VEA EL PROGRESO
-                time.sleep(0.5)  # 🔥 INCREMENTADO A 0.5 SEGUNDOS
+                #  SLEEP PARA QUE EL USUARIO VEA EL PROGRESO
+                time.sleep(0.5)  #  INCREMENTADO A 0.5 SEGUNDOS
                 
                 # Marcar como completado
                 if steps_column.controls:
@@ -754,9 +758,9 @@ def get_batch_registration_view(page, on_continue):
                     last_step.controls[0] = ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN_600, size=16)
                     last_step.controls[1].color = ft.Colors.GREEN_600
                 
-                # 🔥 ACTUALIZAR DE NUEVO
+                #  ACTUALIZAR DE NUEVO
                 page.update()
-                time.sleep(0.3)  # 🔥 PAUSA ADICIONAL PARA VER EL COMPLETADO
+                time.sleep(0.3)  #  PAUSA ADICIONAL PARA VER EL COMPLETADO
                 
             def retry_connection():
                 """Función para reintentar la conexión"""
@@ -771,23 +775,23 @@ def get_batch_registration_view(page, on_continue):
                 page.update()
             
             try:
-                # 🔥 EJECUTAR PASOS CON PROGRESO VISUAL Y FORZAR UPDATES
+                #  EJECUTAR PASOS CON PROGRESO VISUAL Y FORZAR UPDATES
                 update_progress("🔌 Estableciendo conexión con PLC...", "Verificando puerto COM y protocolo Modbus", 10)
                 
                 update_progress("🎯 Enviando modo de operación...", f"Configurando modo {selected_mode.upper()}", 25)
                 
                 update_progress("⚙️ Enviando ratio del medidor...", f"Ratio: {meter_data['ratio']}", 40)
                 
-                update_progress("📊 Enviando caudal nominal...", f"Q3: {meter_data['nominal_flow']} L/h", 55)
+                update_progress(" Enviando caudal nominal...", f"Q3: {meter_data['nominal_flow']} L/h", 55)
                 
                 update_progress("📦 Enviando volúmenes de prueba...", "Configurando volúmenes Q1, Q2, Q3, Q4", 70)
                 
                 update_progress("🔄 Procesando comandos...", "Ejecutando secuencia de comandos Modbus", 85)
                 
-                # 🔥 ENVIAR DATOS REALES AL PLC - CON LOGGING INTEGRADO
+                #  ENVIAR DATOS REALES AL PLC - CON LOGGING INTEGRADO
                 print("[BATCH_REG] 🚀 Iniciando envío real de datos...")
                 
-                # 🔥 FUNCIÓN INTEGRADA PARA ENVIAR DATOS CON PROGRESO EN TIEMPO REAL
+                #  FUNCIÓN INTEGRADA PARA ENVIAR DATOS CON PROGRESO EN TIEMPO REAL
                 def send_data_with_visual_progress():
                     try:
                         print(f"[PLC_COMM] 📡 Iniciando envío de datos al PLC en modo: {selected_mode}")
@@ -795,51 +799,51 @@ def get_batch_registration_view(page, on_continue):
                         success_count = 0
                         total_operations = 7  # Número fijo de operaciones
                         
-                        # 🔥 OPERACIÓN 1: ENVIAR MODO
+                        #  OPERACIÓN 1: ENVIAR MODO
                         if selected_mode == "manual":
                             print(f"[PLC_COMM] 🔧 Enviando comando: Modo Manual (bit M272)")
                             if send_bool_m(272):
                                 success_count += 1
-                                print(f"[PLC_COMM] ✅ Modo Manual activado correctamente")
+                                print(f"[PLC_COMM]  Modo Manual activado correctamente")
                             else:
                                 print(f"[PLC_COMM] ❌ Error activando Modo Manual")
                         else:
                             print(f"[PLC_COMM] 🤖 Enviando comando: Modo Automático (bit M271)")
                             if send_bool_m(271):
                                 success_count += 1
-                                print(f"[PLC_COMM] ✅ Modo Automático activado correctamente")
+                                print(f"[PLC_COMM]  Modo Automático activado correctamente")
                             else:
                                 print(f"[PLC_COMM] ❌ Error activando Modo Automático")
 
-                        # 🔥 PAUSA VISUAL
+                        #  PAUSA VISUAL
                         time.sleep(0.3)
 
-                        # 🔥 OPERACIÓN 2: ENVIAR RATIO
+                        #  OPERACIÓN 2: ENVIAR RATIO
                         ratio_value = int(meter_data["ratio"])
                         q3_nominal = float(meter_data["nominal_flow"])
 
-                        print(f"[PLC_COMM] 📊 Enviando configuración del medidor:")
+                        print(f"[PLC_COMM]  Enviando configuración del medidor:")
                         print(f"  • Ratio: {ratio_value}")
                         print(f"  • Q3 (Nominal): {q3_nominal} L/h")
 
                         if send_to_plc_register("D122", ratio_value, "int"):
                             success_count += 1
-                            print(f"[PLC_COMM] ✅ Ratio enviado a D122")
+                            print(f"[PLC_COMM]  Ratio enviado a D122")
                         else:
                             print(f"[PLC_COMM] ❌ Error enviando ratio")
 
                         time.sleep(0.3)
 
-                        # 🔥 OPERACIÓN 3: ENVIAR CAUDAL NOMINAL
+                        #  OPERACIÓN 3: ENVIAR CAUDAL NOMINAL
                         if send_to_plc_register("D144", q3_nominal, "float"):
                             success_count += 1
-                            print(f"[PLC_COMM] ✅ Q3 nominal enviado a D144")
+                            print(f"[PLC_COMM]  Q3 nominal enviado a D144")
                         else:
                             print(f"[PLC_COMM] ❌ Error enviando Q3 nominal")
 
                         time.sleep(0.3)
 
-                        # 🔥 OPERACIONES 4-7: ENVIAR VOLÚMENES
+                        #  OPERACIONES 4-7: ENVIAR VOLÚMENES
                         test_address_map = {
                             "Q1": "D118",
                             "Q2": "D116", 
@@ -875,10 +879,10 @@ def get_batch_registration_view(page, on_continue):
                                 else:
                                     print(f"[PLC_COMM] ❌ Error enviando volumen {test_type} (0L)")
                             
-                            time.sleep(0.2)  # 🔥 PAUSA ENTRE COMANDOS
+                            time.sleep(0.2)  #  PAUSA ENTRE COMANDOS
 
-                        # 🔥 MOSTRAR RESUMEN COMPLETO
-                        print(f"[PLC_COMM] 📊 Resumen de envío:")
+                        #  MOSTRAR RESUMEN COMPLETO
+                        print(f"[PLC_COMM]  Resumen de envío:")
                         print(f"  • Operaciones exitosas: {success_count}/{total_operations}")
                         print(f"  • Porcentaje de éxito: {(success_count/total_operations)*100:.1f}%")
 
@@ -886,7 +890,7 @@ def get_batch_registration_view(page, on_continue):
                         is_success = (success_count / total_operations) >= 0.8
                         
                         if is_success:
-                            print(f"[PLC_COMM] ✅ Envío completado exitosamente")
+                            print(f"[PLC_COMM]  Envío completado exitosamente")
                         else:
                             print(f"[PLC_COMM] ⚠️ Envío completado con errores")
                             
@@ -896,20 +900,20 @@ def get_batch_registration_view(page, on_continue):
                         print(f"[PLC_COMM] ❌ Error crítico enviando datos al PLC: {e}")
                         return False
                 
-                # 🔥 LLAMAR A LA FUNCIÓN INTEGRADA
+                #  LLAMAR A LA FUNCIÓN INTEGRADA
                 success = send_data_with_visual_progress()
                 
-                update_progress("✅ Verificando datos enviados...", "Confirmando recepción en PLC", 95)
+                update_progress(" Verificando datos enviados...", "Confirmando recepción en PLC", 95)
                 
                 if success:
                     update_progress("🎉 ¡Comunicación exitosa!", "Todos los datos enviados correctamente", 100)
                     
-                    # 🔥 FINALIZAR CON ÉXITO
-                    progress_text.value = "✅ ¡Configuración completada!"
+                    #  FINALIZAR CON ÉXITO
+                    progress_text.value = " ¡Configuración completada!"
                     progress_details.value = "Preparando interfaz de operación..."
                     progress_ring.visible = False
                     
-                    # 🔥 MOSTRAR ÍCONO DE ÉXITO
+                    #  MOSTRAR ÍCONO DE ÉXITO
                     success_icon = ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN_600, size=60)
                     progress_dialog.content.content.controls[0] = ft.Container(
                         success_icon,
@@ -924,7 +928,7 @@ def get_batch_registration_view(page, on_continue):
                     progress_dialog.open = False
                     page.update()
                     
-                    # 🔥 CONTINUAR A LA VISTA CORRESPONDIENTE
+                    #  CONTINUAR A LA VISTA CORRESPONDIENTE
                     from views.test_execution_view import get_test_execution_view
             
                     complete_data = {
@@ -940,13 +944,13 @@ def get_batch_registration_view(page, on_continue):
                     page.update()
                     
                 else:
-                    # 🔥 ERROR EN EL ENVÍO
+                    #  ERROR EN EL ENVÍO
                     add_step_indicator("❌ Error en la comunicación", "error")
                     progress_text.value = "❌ Error en la comunicación"
                     progress_details.value = "No se pudieron enviar todos los datos al PLC"
                     progress_ring.visible = False
                     
-                    # 🔥 MOSTRAR ÍCONO DE ERROR
+                    #  MOSTRAR ÍCONO DE ERROR
                     error_icon = ft.Icon(ft.Icons.ERROR, color=ft.Colors.RED_600, size=60)
                     progress_dialog.content.content.controls[0] = ft.Container(
                         error_icon,
@@ -954,7 +958,7 @@ def get_batch_registration_view(page, on_continue):
                         height=80,
                     )
                     
-                    # 🔥 AGREGAR BOTÓN DE REINTENTAR
+                    #  AGREGAR BOTÓN DE REINTENTAR
                     retry_button = ft.ElevatedButton(
                         "🔄 Reintentar",
                         on_click=lambda e: retry_connection(),
@@ -973,13 +977,13 @@ def get_batch_registration_view(page, on_continue):
                     page.update()
                     
             except Exception as error:
-                # 🔥 ERROR CRÍTICO
+                #  ERROR CRÍTICO
                 add_step_indicator(f"💥 Error crítico: {str(error)}", "error")
                 progress_text.value = "❌ Error inesperado"
                 progress_details.value = f"Error: {str(error)[:50]}..."
                 progress_ring.visible = False
                 
-                # 🔥 MOSTRAR ÍCONO DE ERROR CRÍTICO
+                #  MOSTRAR ÍCONO DE ERROR CRÍTICO
                 error_icon = ft.Icon(ft.Icons.WARNING, color=ft.Colors.RED_700, size=60)
                 progress_dialog.content.content.controls[0] = ft.Container(
                     error_icon,
@@ -987,7 +991,7 @@ def get_batch_registration_view(page, on_continue):
                     height=80,
                 )
                 
-                # 🔥 BOTÓN PARA CERRAR
+                #  BOTÓN PARA CERRAR
                 close_button = ft.ElevatedButton(
                     "Cerrar",
                     on_click=lambda e: close_progress_dialog(),
@@ -998,15 +1002,15 @@ def get_batch_registration_view(page, on_continue):
                 progress_dialog.actions = [close_button]
                 page.update()
                 
-                # 🔥 MOSTRAR ERROR EN LA VISTA PRINCIPAL TAMBIÉN
+                #  MOSTRAR ERROR EN LA VISTA PRINCIPAL TAMBIÉN
                 macro_error.value = f"Error crítico: {str(error)}"
-
+    
         def cancel_continue(e):
             confirm_dialog.open = False
             page.update()
 
         confirm_dialog = ft.AlertDialog(
-            title=ft.Text("✅ Confirmar Configuración y Envío"),
+            title=ft.Text(" Confirmar Configuración y Envío"),
             content=ft.Container(
                 content=ft.Text(config_summary, selectable=True),
                 width=500,
@@ -1015,7 +1019,7 @@ def get_batch_registration_view(page, on_continue):
             actions=[
                 ft.TextButton("Cancelar", on_click=cancel_continue),
                 ft.ElevatedButton(
-                    "📡 Enviar al PLC y Continuar", 
+                    " Enviar al PLC y Continuar", 
                     on_click=confirm_and_send_data,
                     style=ft.ButtonStyle(
                         bgcolor=ft.Colors.GREEN_600,
@@ -1029,7 +1033,7 @@ def get_batch_registration_view(page, on_continue):
         confirm_dialog.open = True
         page.update()
 
-    # 🔥 GRUPO 1: DATOS DE MEDIDORES
+    #  GRUPO 1: DATOS DE MEDIDORES
     meter_data_group = ft.Container(
         content=ft.Column([
             ft.Row([
@@ -1059,14 +1063,36 @@ def get_batch_registration_view(page, on_continue):
         margin=ft.margin.only(bottom=20),
     )
 
-    # 🔥 GRUPO 2: MODELO DE ENSAYO
+    #  GRUPO 2: MODELO DE ENSAYO
     test_model_group = ft.Container(
         content=ft.Column([
             ft.Row([
                 ft.Icon(ft.Icons.SCIENCE, color=ft.Colors.GREEN_700, size=24),
-                ft.Text("Modelo de Ensayo", size=20, weight="bold", color=ft.Colors.GREEN_700),
+                ft.Text("Modelo de Ensayo y Medidores", size=20, weight="bold", color=ft.Colors.GREEN_700),
             ], alignment="start"),
-            config_table,  # 🔥 TABLA DE CONFIGURACIÓN DE PRUEBAS
+            
+            #  ESTRUCTURA RESPONSIVA 4:2 (66.7%-33.3%)
+            ft.ResponsiveRow([
+                #  COLUMNA 1: CONFIGURACIÓN DE PRUEBAS (66.7% - 4 PARTES)
+                ft.Container(
+                    content=ft.Column([
+                        ft.Text("Configuración de Pruebas", size=14, weight="bold", color=ft.Colors.GREEN_800),
+                        config_table,
+                    ], spacing=10),
+                    col={"xs": 12, "sm": 12, "md": 8, "lg": 8, "xl": 8},  #  8/12 = 66.7% ≈ 4 PARTES
+                    padding=ft.padding.only(right=10),
+                ),
+                
+                #  COLUMNA 2: TABLA DE MEDIDORES (33.3% - 2 PARTES)
+                ft.Container(
+                    content=ft.Column([
+                        meter_table.build(),
+                    ], spacing=10),
+                    col={"xs": 12, "sm": 12, "md": 4, "lg": 4, "xl": 4},  #  4/12 = 33.3% ≈ 2 PARTES
+                    padding=ft.padding.only(left=10),
+                ),
+            ], spacing=20),
+            
         ], spacing=15),
         padding=20,
         border_radius=12,
@@ -1075,7 +1101,7 @@ def get_batch_registration_view(page, on_continue):
         margin=ft.margin.only(bottom=20),
     )
 
-    # 🔥 GRUPO 3: MODO DE OPERACIÓN
+    #  GRUPO 3: MODO DE OPERACIÓN
     operation_mode_group = ft.Container(
         content=ft.Column([
             ft.Row([
@@ -1097,12 +1123,12 @@ def get_batch_registration_view(page, on_continue):
         margin=ft.margin.only(bottom=20),
     )
 
-    # 🔥 BOTÓN DE CONTINUAR Y ERRORES
+    #  BOTÓN DE CONTINUAR Y ERRORES
     action_section = ft.Container(
         content=ft.Column([
             macro_error,
             ft.ElevatedButton(
-                "📡 Enviar Configuración y Continuar",
+                " Enviar Configuración y Continuar",
                 on_click=validate_and_continue,
                 width=350,
                 height=50,
@@ -1117,7 +1143,7 @@ def get_batch_registration_view(page, on_continue):
         alignment=ft.alignment.center,
     )
 
-    # 🔥 LAYOUT PRINCIPAL CON SCROLL
+    #  LAYOUT PRINCIPAL CON SCROLL
     return ft.Column([
         ft.Container(
             content=ft.Text(
@@ -1131,10 +1157,10 @@ def get_batch_registration_view(page, on_continue):
             alignment=ft.alignment.center,
         ),
         
-        meter_data_group,        # 🔥 GRUPO 1
-        test_model_group,        # 🔥 GRUPO 2  
-        operation_mode_group,    # 🔥 GRUPO 3
-        action_section,          # 🔥 ACCIONES
+        meter_data_group,        #  GRUPO 1
+        test_model_group,        #  GRUPO 2  
+        operation_mode_group,    #  GRUPO 3
+        action_section,          #  ACCIONES
         
     ], 
     scroll=ft.ScrollMode.AUTO,

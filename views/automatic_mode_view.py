@@ -20,11 +20,11 @@ def send_bool_m(bit, update_messages_ui, read_fc_states):
         service.send_command(comand_off)
         print(f"[MODBUS] Bit M{bit} activado/desactivado")
         
-        # 🔥 LLAMADA SIMPLIFICADA Y DIRECTA
+        #  LLAMADA SIMPLIFICADA Y DIRECTA
         threading.Timer(0.3, update_messages_ui).start()
         
     except Exception as ex:
-        print(f"[MODBUS] ❌ Error en send_bool_m para M{bit}: {ex}")
+        print(f"[MODBUS]  Error en send_bool_m para M{bit}: {ex}")
 
 def get_automatic_mode_view(page, meter_group_id, selected_batch):
 
@@ -52,10 +52,10 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
     inst_vol_q3 = readonly_input("Volumen Q3 (Inst.)")
     inst_vol_q4 = readonly_input("Volumen Q4 (Inst.)")
 
-    # ✅ CREAR LA REFERENCIA A LA TABLA AQUÍ (ANTES DE update_ui)
+    #  CREAR LA REFERENCIA A LA TABLA AQUÍ (ANTES DE update_ui)
     table_widget = table_tests()
     
-    # 🔥 DEBUG: Verificar inmediatamente después de crear
+    #  DEBUG: Verificar inmediatamente después de crear
     print(f"[DEBUG] table_widget creado: {type(table_widget)}")
     print(f"[DEBUG] table_widget tiene método: {hasattr(table_widget, 'actualizar_valores_instantaneos')}")
     if hasattr(table_widget, 'actualizar_valores_instantaneos'):
@@ -74,7 +74,7 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
                 status_text = "\n".join(active_messages)
                 system_status_display.value = status_text
                 
-                # 🔥 DETECTAR QUÉ PRUEBA ESTÁ ACTIVA
+                #  DETECTAR QUÉ PRUEBA ESTÁ ACTIVA
                 for message in active_messages:
                     if "🧪 Inicio de prueba Q1" in message:
                         last_active_test = "Q1"
@@ -89,8 +89,8 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
                         last_active_test = "Q4"
                         print(f"[AUTO_MODE] 🧪 Prueba activa: Q4")
                     
-                    # 🔥 DETECTAR TAMBIÉN FIN DE PRUEBA INDIVIDUAL COMO BACKUP
-                    elif "✅ Fin de prueba Q1" in message:
+                    #  DETECTAR TAMBIÉN FIN DE PRUEBA INDIVIDUAL COMO BACKUP
+                    elif " Fin de prueba Q1" in message:
                         if last_active_test == "Q1":
                             print(f"[AUTO_MODE] 🏁 FIN DE PRUEBA Q1 DETECTADO")
                             current_volume = float(inst_vol_q1.value) if inst_vol_q1.value else 0.0
@@ -99,7 +99,7 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
                                 table_widget.capture_pattern_volume("Q1", current_volume)
                                 last_active_test = None
                     
-                    elif "✅ Fin de prueba Q2" in message:
+                    elif " Fin de prueba Q2" in message:
                         if last_active_test == "Q2":
                             print(f"[AUTO_MODE] 🏁 FIN DE PRUEBA Q2 DETECTADO")
                             current_volume = float(inst_vol_q2.value) if inst_vol_q2.value else 0.0
@@ -108,7 +108,7 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
                                 table_widget.capture_pattern_volume("Q2", current_volume)
                                 last_active_test = None
                     
-                    elif "✅ Fin de prueba Q3" in message:
+                    elif " Fin de prueba Q3" in message:
                         if last_active_test == "Q3":
                             print(f"[AUTO_MODE] 🏁 FIN DE PRUEBA Q3 DETECTADO")
                             current_volume = float(inst_vol_q3.value) if inst_vol_q3.value else 0.0
@@ -117,7 +117,7 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
                                 table_widget.capture_pattern_volume("Q3", current_volume)
                                 last_active_test = None
                     
-                    elif "✅ Fin de prueba Q4" in message:  # FC19
+                    elif " Fin de prueba Q4" in message:  # FC19
                         if last_active_test == "Q4":
                             print(f"[AUTO_MODE] 🏁 FIN DE PRUEBA Q4 DETECTADO")
                             current_volume = float(inst_vol_q4.value) if inst_vol_q4.value else 0.0
@@ -126,9 +126,9 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
                                 table_widget.capture_pattern_volume("Q4", current_volume)
                                 last_active_test = None
                     
-                    # 🔥 BACKUP: DETECTAR FC23 COMO SEGUNDA OPCIÓN
+                    #  BACKUP: DETECTAR FC23 COMO SEGUNDA OPCIÓN
                     elif "⏳ Estado de espera, vuelta a inicio de la selección de la prueba" in message:
-                        print(f"[AUTO_MODE] 🔄 Detectado FC23 - VUELTA AL INICIO")
+                        print(f"[AUTO_MODE]  Detectado FC23 - VUELTA AL INICIO")
                         if last_active_test and hasattr(table_widget, 'capture_pattern_volume'):
                             if last_active_test == "Q1":
                                 current_volume = float(inst_vol_q1.value) if inst_vol_q1.value else 0.0
@@ -147,7 +147,7 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
             print(f"Error actualizando estado del sistema: {e}")
     
 
-    # ✅ Controller update function (AHORA table_widget YA ESTÁ DEFINIDA)
+    #  Controller update function (AHORA table_widget YA ESTÁ DEFINIDA)
     def update_ui(kind, data):
         if kind == "instant" and "data" in data:
             # ACTUALIZAR VALORES INSTANTÁNEOS EN UI
@@ -160,14 +160,14 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
             inst_vol_q4.value = f"{data['data'][6]:.2f}"
             page.update()
             
-            # 🔥 ENVIAR VALORES INSTANTÁNEOS A TABLA (SIN FORZAR UPDATE DE TABLA)
+            #  ENVIAR VALORES INSTANTÁNEOS A TABLA (SIN FORZAR UPDATE DE TABLA)
             if hasattr(table_widget, 'actualizar_valores_instantaneos'):
                 table_widget.actualizar_valores_instantaneos(
                     data['data'][3], data['data'][4], data['data'][5], data['data'][6]
                 )
         
         elif kind == "log" and "log" in data:
-            # 🔥 MANEJAR LOGS NORMALES
+            #  MANEJAR LOGS NORMALES
             print(f"[MODBUS_LOG] {data['log']}")
 
     # Pulsador button generator usando el número de bit
@@ -175,7 +175,7 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
         def on_click(e):
             print(f"[BOTÓN] Presionado: {name} (M{bit})")
             
-            # 🔥 DETECTAR TIPO DE PRUEBA Y NOTIFICAR INICIO
+            #  DETECTAR TIPO DE PRUEBA Y NOTIFICAR INICIO
             test_type_mapping = {
                 264: "Q1",  # Caudal Q1
                 265: "Q2",  # Caudal Q2
@@ -183,7 +183,7 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
                 267: "Q4",  # Caudal Q4
             }
             
-            # 🔥 SI ES UN BOTÓN DE CAUDAL, NOTIFICAR INICIO DE CONFIGURACIÓN
+            #  SI ES UN BOTÓN DE CAUDAL, NOTIFICAR INICIO DE CONFIGURACIÓN
             if bit in test_type_mapping:
                 test_type = test_type_mapping[bit]
                 print(f"[AUTOMATIC_MODE] 🔧 Configurando prueba: {test_type}")
@@ -192,7 +192,7 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
                 if hasattr(table_widget, 'notify_test_start'):
                     table_widget.notify_test_start(test_type)
             
-            # 🔥 MANTENER EL SISTEMA DE ENVÍO ORIGINAL
+            #  MANTENER EL SISTEMA DE ENVÍO ORIGINAL
             send_bool_m(bit, update_system_status_from_automatic, controller.service.read_system_status)
             
         return ft.ElevatedButton(content=ft.Text(name), width=180, on_click=on_click)
@@ -307,7 +307,7 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
 
     # Columns
     left_column = ft.Column([
-        ft.Text("📦 Configuración y Lecturas", weight="bold", text_align="center"),
+        ft.Text(" Configuración y Lecturas", weight="bold", text_align="center"),
         ratio_input,
         q1_flow,
         q2_flow,
@@ -322,14 +322,14 @@ def get_automatic_mode_view(page, meter_group_id, selected_batch):
         send_button
     ], spacing=10, alignment="center", horizontal_alignment="center")
 
-    # ✅ USAR LA VARIABLE table_widget YA DEFINIDA
+    #  USAR LA VARIABLE table_widget YA DEFINIDA
     center_column = ft.Column([
-        ft.Text("📋 Resultados de pruebas", weight="bold", text_align="center"),
-        table_widget  # ✅ AQUÍ USAS LA VARIABLE YA CREADA
+        ft.Text(" Resultados de pruebas", weight="bold", text_align="center"),
+        table_widget  #  AQUÍ USAS LA VARIABLE YA CREADA
     ], spacing=15, alignment="center", horizontal_alignment="center")
 
     right_column = ft.Column([
-        ft.Text("📊 Valores instantáneos", weight="bold", text_align="center"),
+        ft.Text(" Valores instantáneos", weight="bold", text_align="center"),
         inst_flow_q1,
         inst_flow_q2,
         inst_flow_q3,

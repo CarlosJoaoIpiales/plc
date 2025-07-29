@@ -44,14 +44,14 @@ class TestButtonsModule:
                 callback_update(read_status_func)
                 
         except Exception as ex:
-            print(f"❌ Error al enviar a M{bit}: {ex}")
+            print(f" Error al enviar a M{bit}: {ex}")
     
     def create_test_button(self, name, bit):
         """Crea un botón de prueba con la lógica original"""
         def on_click(e):
             print(f"[BOTÓN] Presionado: {name} (M{bit})")
             
-            # 🔥 DETECTAR TIPO DE PRUEBA Y NOTIFICAR INICIO
+            #  DETECTAR TIPO DE PRUEBA Y NOTIFICAR INICIO
             test_type_mapping = {
                 264: "Q1",  # Caudal Q1
                 265: "Q2",  # Caudal Q2
@@ -59,7 +59,7 @@ class TestButtonsModule:
                 267: "Q4",  # Caudal Q4
             }
             
-            # 🔥 SI ES UN BOTÓN DE CAUDAL, NOTIFICAR INICIO DE CONFIGURACIÓN
+            #  SI ES UN BOTÓN DE CAUDAL, NOTIFICAR INICIO DE CONFIGURACIÓN
             if bit in test_type_mapping:
                 test_type = test_type_mapping[bit]
                 print(f"[TEST_BUTTONS] 🔧 Configurando prueba: {test_type}")
@@ -71,7 +71,7 @@ class TestButtonsModule:
                 # Notificar al callback de selección de prueba
                 self.on_test_selected(test_type)
             
-            # 🔥 MANTENER EL SISTEMA DE ENVÍO ORIGINAL
+            #  MANTENER EL SISTEMA DE ENVÍO ORIGINAL
             self.send_bool_m(bit)
             
         return ft.ElevatedButton(
@@ -111,7 +111,7 @@ class TestButtonsModule:
             content=ft.Column([
                 ft.Text("⚙️ Controles de prueba", weight="bold", text_align="center", size=16),
                 
-                # 🔥 NUEVA DISTRIBUCIÓN: 5 COLUMNAS EN UNA SOLA FILA
+                #  NUEVA DISTRIBUCIÓN: 5 COLUMNAS EN UNA SOLA FILA
                 ft.Row([
                     # Columna 1: Q1
                     ft.Container(

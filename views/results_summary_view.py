@@ -11,21 +11,21 @@ class ResultsSummaryView:
         self.completed_tests = summary_data.get("completed_tests", [])
         self.session_data = summary_data.get("session_data", {})
         
-        # 🔥 ESTADÍSTICAS GENERALES
+        #  ESTADÍSTICAS GENERALES
         self.total_groups = summary_data.get("total_groups", 0)
         self.total_meters = summary_data.get("total_meters", 0)
         self.total_passed = summary_data.get("total_passed", 0)
         self.total_failed = self.total_meters - self.total_passed
         self.success_rate = (self.total_passed / self.total_meters * 100) if self.total_meters > 0 else 0
         
-        print(f"[RESULTS_SUMMARY] 🚀 Inicializando vista de resumen")
-        print(f"[RESULTS_SUMMARY] 📊 Sesión ID: {self.session_id}")
-        print(f"[RESULTS_SUMMARY] 📊 Total grupos: {self.total_groups}")
-        print(f"[RESULTS_SUMMARY] 📊 Total medidores: {self.total_meters}")
-        print(f"[RESULTS_SUMMARY] 📊 Tasa de éxito: {self.success_rate:.1f}%")
+        print(f"[RESULTS_SUMMARY]  Inicializando vista de resumen")
+        print(f"[RESULTS_SUMMARY]  Sesión ID: {self.session_id}")
+        print(f"[RESULTS_SUMMARY]  Total grupos: {self.total_groups}")
+        print(f"[RESULTS_SUMMARY]  Total medidores: {self.total_meters}")
+        print(f"[RESULTS_SUMMARY]  Tasa de éxito: {self.success_rate:.1f}%")
 
     def _build_general_summary(self):
-        """🔥 CONSTRUYE RESUMEN GENERAL CON ESTADÍSTICAS CLAVE"""
+        """ CONSTRUYE RESUMEN GENERAL CON ESTADÍSTICAS CLAVE"""
         return ft.Container(
             content=ft.Row([
                 self._create_stat_card("Grupos de Pruebas", str(self.total_groups), ft.Colors.BLUE_600),
@@ -39,31 +39,31 @@ class ResultsSummaryView:
         )
 
     def build(self):
-        """🔥 CONSTRUYE LA VISTA COMPLETA DE RESUMEN DE RESULTADOS"""
+        """ CONSTRUYE LA VISTA COMPLETA DE RESUMEN DE RESULTADOS"""
         try:
-            # 🔥 CREAR TABS PARA ORGANIZAR LA INFORMACIÓN
+            #  CREAR TABS PARA ORGANIZAR LA INFORMACIÓN
             tabs = ft.Tabs(
                 selected_index=0,
                 animation_duration=300,
                 tabs=[
                     ft.Tab(
-                        text="📊 Resumen General",
+                        text=" Resumen General",
                         content=ft.Container(
                             content=ft.Column([
                                 self._build_header(),
                                 self._build_general_summary(),
                                 self._build_summary_table(),
-                            ], spacing=20, scroll=ft.ScrollMode.AUTO),  # 🔥 MOVER SCROLL AQUÍ
+                            ], spacing=20, scroll=ft.ScrollMode.AUTO),  #  MOVER SCROLL AQUÍ
                             padding=20,
                             height=600,
                         )
                     ),
                     ft.Tab(
-                        text="📋 Detalle de Grupos",
+                        text=" Detalle de Grupos",
                         content=ft.Container(
                             content=ft.Column([
                                 self._build_groups_detail(),
-                            ], scroll=ft.ScrollMode.AUTO),  # 🔥 MOVER SCROLL AQUÍ
+                            ], scroll=ft.ScrollMode.AUTO),  #  MOVER SCROLL AQUÍ
                             height=600,
                         )
                     ),
@@ -72,7 +72,7 @@ class ResultsSummaryView:
                         content=ft.Container(
                             content=ft.Column([
                                 self._build_meter_report(),
-                            ], scroll=ft.ScrollMode.AUTO),  # 🔥 MOVER SCROLL AQUÍ
+                            ], scroll=ft.ScrollMode.AUTO),  #  MOVER SCROLL AQUÍ
                             height=600,
                         )
                     ),
@@ -81,7 +81,7 @@ class ResultsSummaryView:
                         content=ft.Container(
                             content=ft.Column([
                                 self._build_statistics(),
-                            ], scroll=ft.ScrollMode.AUTO),  # 🔥 MOVER SCROLL AQUÍ
+                            ], scroll=ft.ScrollMode.AUTO),  #  MOVER SCROLL AQUÍ
                             height=600,
                         )
                     ),
@@ -90,7 +90,7 @@ class ResultsSummaryView:
                         content=ft.Container(
                             content=ft.Column([
                                 self._build_export_options(),
-                            ], scroll=ft.ScrollMode.AUTO),  # 🔥 MOVER SCROLL AQUÍ
+                            ], scroll=ft.ScrollMode.AUTO),  #  MOVER SCROLL AQUÍ
                             height=600,
                         )
                     ),
@@ -98,7 +98,7 @@ class ResultsSummaryView:
                 height=700,
             )
 
-            # 🔥 LAYOUT PRINCIPAL CON ALTURA CONTROLADA
+            #  LAYOUT PRINCIPAL CON ALTURA CONTROLADA
             main_layout = ft.Container(
                 content=ft.Column([
                     tabs,
@@ -111,18 +111,18 @@ class ResultsSummaryView:
             return main_layout
             
         except Exception as e:
-            print(f"[RESULTS_SUMMARY] ❌ Error construyendo vista: {e}")
+            print(f"[RESULTS_SUMMARY]  Error construyendo vista: {e}")
             return self._build_error_view(str(e))
 
     def _build_header(self):
-        """🔥 CONSTRUYE EL HEADER CON INFORMACIÓN COMPLETA DE LA SESIÓN"""
-        # 🔥 OBTENER INFORMACIÓN COMPLETA DEL BATCH
+        """ CONSTRUYE EL HEADER CON INFORMACIÓN COMPLETA DE LA SESIÓN"""
+        #  OBTENER INFORMACIÓN COMPLETA DEL BATCH
         batch_info = self.summary_data.get("batch_info", {})
         
         client_name = batch_info.get("client", self.session_data.get("client_name", "Cliente Desconocido"))
         technician_name = batch_info.get("technician", self.session_data.get("technician_name", "Técnico Desconocido"))
         
-        # 🔥 INFORMACIÓN COMPLETA DEL MEDIDOR
+        #  INFORMACIÓN COMPLETA DEL MEDIDOR
         brand = batch_info.get("meter_brand", self.session_data.get("brand", "N/A"))
         model = batch_info.get("meter_model", self.session_data.get("model", "N/A"))
         meter_type = batch_info.get("meter_type", self.session_data.get("type", "N/A"))
@@ -131,19 +131,19 @@ class ResultsSummaryView:
         diameter = batch_info.get("diameter", self.session_data.get("diameter", "N/A"))
         batch_status = batch_info.get("batch_status", self.session_data.get("batch", "nuevo")).upper()
         
-        # 🔥 FECHA Y HORA
+        #  FECHA Y HORA
         current_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         
-        # 🔥 INDICADOR DE ÉXITO
+        #  INDICADOR DE ÉXITO
         success_color = ft.Colors.GREEN if self.success_rate >= 80 else ft.Colors.ORANGE if self.success_rate >= 50 else ft.Colors.RED
-        success_icon = "✅" if self.success_rate >= 80 else "⚠️" if self.success_rate >= 50 else "❌"
+        success_icon = "" if self.success_rate >= 80 else "" if self.success_rate >= 50 else ""
 
         header = ft.Container(
             content=ft.Column([
-                # 🔥 TÍTULO PRINCIPAL
+                #  TÍTULO PRINCIPAL
                 ft.Row([
                     ft.Text(
-                        "📋 Resumen de Resultados de Pruebas",
+                        " Resumen de Resultados de Pruebas",
                         size=28,
                         weight="bold",
                         color=ft.Colors.BLUE_900
@@ -161,9 +161,9 @@ class ResultsSummaryView:
                     )
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 
-                # 🔥 INFORMACIÓN COMPLETA DE LA SESIÓN EN TARJETAS
+                #  INFORMACIÓN COMPLETA DE LA SESIÓN EN TARJETAS
                 ft.ResponsiveRow([
-                    # 🔥 TARJETA 1: CLIENTE Y TÉCNICO
+                    #  TARJETA 1: CLIENTE Y TÉCNICO
                     ft.Container(
                         content=ft.Column([
                             ft.Text("👥 Participantes", size=14, weight="bold", color=ft.Colors.BLUE_700),
@@ -189,7 +189,7 @@ class ResultsSummaryView:
                         margin=5,
                     ),
                     
-                    # 🔥 TARJETA 2: ESPECIFICACIONES DEL MEDIDOR
+                    #  TARJETA 2: ESPECIFICACIONES DEL MEDIDOR
                     ft.Container(
                         content=ft.Column([
                             ft.Text("📏 Especificaciones del Medidor", size=14, weight="bold", color=ft.Colors.PURPLE_700),
@@ -207,7 +207,7 @@ class ResultsSummaryView:
                                 ft.Text(str(meter_type), size=12, color=ft.Colors.PURPLE_700, weight="bold"),
                             ]),
                             ft.Row([
-                                ft.Text("📦 Estado:", size=12, weight="bold", color=ft.Colors.GREY_700),
+                                ft.Text(" Estado:", size=12, weight="bold", color=ft.Colors.GREY_700),
                                 ft.Text(batch_status, size=12, color=ft.Colors.PURPLE_700, weight="bold"),
                             ]),
                         ], spacing=8),
@@ -219,7 +219,7 @@ class ResultsSummaryView:
                         margin=5,
                     ),
                     
-                    # 🔥 TARJETA 3: CARACTERÍSTICAS TÉCNICAS
+                    #  TARJETA 3: CARACTERÍSTICAS TÉCNICAS
                     ft.Container(
                         content=ft.Column([
                             ft.Text("🔧 Características Técnicas", size=14, weight="bold", color=ft.Colors.ORANGE_700),
@@ -237,7 +237,7 @@ class ResultsSummaryView:
                                 ft.Text(f"{diameter} mm" if diameter != "N/A" else "N/A", size=12, color=ft.Colors.ORANGE_700, weight="bold"),
                             ]),
                             ft.Row([
-                                ft.Text("📊 Medidores:", size=12, weight="bold", color=ft.Colors.GREY_700),
+                                ft.Text(" Medidores:", size=12, weight="bold", color=ft.Colors.GREY_700),
                                 ft.Text(f"{self.total_meters} probados", size=12, color=ft.Colors.GREEN),
                             ]),
                         ], spacing=8),
@@ -257,7 +257,7 @@ class ResultsSummaryView:
         return header
 
     def _build_groups_detail(self):
-        """🔥 CONSTRUYE DETALLE COMPLETO DE CADA GRUPO DE PRUEBA"""
+        """ CONSTRUYE DETALLE COMPLETO DE CADA GRUPO DE PRUEBA"""
         groups_containers = []
 
         for i, test_group in enumerate(self.completed_tests):
@@ -266,16 +266,16 @@ class ResultsSummaryView:
             summary = test_group["summary"]
             results = test_group["results"]
 
-            # 🔥 HEADER DEL GRUPO CON MÁS INFORMACIÓN
+            #  HEADER DEL GRUPO CON MÁS INFORMACIÓN
             group_header = ft.Container(
                 content=ft.Column([
                     ft.Row([
                         ft.Text(f"🧪 {test_name}", size=16, weight="bold", color=ft.Colors.PURPLE_700),
-                        ft.Text(f"✅ {summary['passed']}/{summary['total']} ({summary['success_rate']:.1f}%)", 
+                        ft.Text(f" {summary['passed']}/{summary['total']} ({summary['success_rate']:.1f}%)", 
                                 size=14, color=ft.Colors.GREEN if summary['success_rate'] >= 80 else ft.Colors.ORANGE),
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     
-                    # 🔥 INFORMACIÓN ADICIONAL DEL GRUPO
+                    #  INFORMACIÓN ADICIONAL DEL GRUPO
                     ft.Row([
                         ft.Text(f"📅 Completado: {test_group.get('completed_at', 'N/A')}", size=12, color=ft.Colors.GREY_600),
                         ft.Text(f"🔢 Repetición: {test_group.get('repetition', 1)}", size=12, color=ft.Colors.GREY_600),
@@ -287,13 +287,13 @@ class ResultsSummaryView:
                 border=ft.border.all(1, ft.Colors.PURPLE_300),
             )
 
-            # 🔥 TABLA DE RESULTADOS DEL GRUPO CON TODOS LOS CAMPOS
+            #  TABLA DE RESULTADOS DEL GRUPO CON TODOS LOS CAMPOS
             result_rows = []
             for j, result in enumerate(results, 1):
                 status_color = ft.Colors.GREEN if result["is_passed"] else ft.Colors.RED
-                status_text = "✅ PASA" if result["is_passed"] else "❌ NO PASA"
+                status_text = " PASA" if result["is_passed"] else " NO PASA"
 
-                # 🔥 USAR "serial_number" EN LUGAR DE "serial"
+                #  USAR "serial_number" EN LUGAR DE "serial"
                 serial_number = result.get("serial_number", result.get("serial", "N/A"))
 
                 result_rows.append(ft.DataRow(cells=[
@@ -325,7 +325,7 @@ class ResultsSummaryView:
                 column_spacing=15,
             )
 
-            # 🔥 CONTAINER DEL GRUPO COMPLETO CON ALTURA CONTROLADA
+            #  CONTAINER DEL GRUPO COMPLETO CON ALTURA CONTROLADA
             group_container = ft.Container(
                 content=ft.Column([
                     group_header,
@@ -349,12 +349,12 @@ class ResultsSummaryView:
             groups_containers.append(group_container)
 
         return ft.Column([
-            ft.Text("📋 Detalle Completo de Grupos de Pruebas", size=18, weight="bold", color=ft.Colors.BLUE_700),
+            ft.Text(" Detalle Completo de Grupos de Pruebas", size=18, weight="bold", color=ft.Colors.BLUE_700),
             ft.Column(groups_containers, spacing=0, scroll=ft.ScrollMode.AUTO),
         ], spacing=15)
 
     def _create_stat_card(self, title, value, color):
-        """🔥 CREA UNA TARJETA DE ESTADÍSTICA"""
+        """ CREA UNA TARJETA DE ESTADÍSTICA"""
         return ft.Container(
             content=ft.Column([
                 ft.Text(title, size=12, color="white", text_align="center", weight="bold"),
@@ -369,8 +369,8 @@ class ResultsSummaryView:
         )
 
     def _build_summary_table(self):
-        """🔥 CONSTRUYE TABLA RESUMEN POR TIPO DE PRUEBA"""
-        # 🔥 ORGANIZAR DATOS POR TIPO DE PRUEBA
+        """ CONSTRUYE TABLA RESUMEN POR TIPO DE PRUEBA"""
+        #  ORGANIZAR DATOS POR TIPO DE PRUEBA
         summary_by_type = {}
         
         for test_group in self.completed_tests:
@@ -390,7 +390,7 @@ class ResultsSummaryView:
             summary_by_type[test_type]["passed"] += summary["passed"]
             summary_by_type[test_type]["failed"] += summary["failed"]
 
-        # 🔥 CREAR FILAS DE LA TABLA
+        #  CREAR FILAS DE LA TABLA
         table_rows = []
         for test_type in ["Q1", "Q2", "Q3", "Q4"]:
             if test_type in summary_by_type:
@@ -423,7 +423,7 @@ class ResultsSummaryView:
 
         return ft.Container(
             content=ft.Column([
-                ft.Text("📊 Resumen por Tipo de Prueba", size=18, weight="bold", color=ft.Colors.BLUE_700),
+                ft.Text(" Resumen por Tipo de Prueba", size=18, weight="bold", color=ft.Colors.BLUE_700),
                 ft.Container(
                     content=summary_table,
                     border_radius=10,
@@ -435,13 +435,13 @@ class ResultsSummaryView:
 
 
     def _build_meter_report(self):
-        """🔥 CONSTRUYE INFORME POR MEDIDOR INDIVIDUAL CON TODOS LOS CAMPOS"""
-        # 🔥 ORGANIZAR DATOS POR MEDIDOR
+        """ CONSTRUYE INFORME POR MEDIDOR INDIVIDUAL CON TODOS LOS CAMPOS"""
+        #  ORGANIZAR DATOS POR MEDIDOR
         meters_data = {}
         
         for test_group in self.completed_tests:
             for result in test_group["results"]:
-                # 🔥 USAR "serial_number" EN LUGAR DE "serial"
+                #  USAR "serial_number" EN LUGAR DE "serial"
                 serial = result.get("serial_number", result.get("serial", "N/A"))
                 
                 if serial not in meters_data:
@@ -467,14 +467,14 @@ class ResultsSummaryView:
                     meters_data[serial]["failed_tests"] += 1
                     meters_data[serial]["overall_passed"] = False
 
-        # 🔥 CREAR TARJETAS PARA CADA MEDIDOR
+        #  CREAR TARJETAS PARA CADA MEDIDOR
         meter_cards = []
         
         for serial, meter_data in meters_data.items():
             overall_color = ft.Colors.GREEN if meter_data["overall_passed"] else ft.Colors.RED
-            overall_icon = "✅" if meter_data["overall_passed"] else "❌"
+            overall_icon = "" if meter_data["overall_passed"] else ""
             
-            # 🔥 TABLA DE PRUEBAS DEL MEDIDOR CON TODOS LOS CAMPOS
+            #  TABLA DE PRUEBAS DEL MEDIDOR CON TODOS LOS CAMPOS
             test_rows = []
             for test in meter_data["tests"]:
                 result = test["result"]
@@ -493,7 +493,7 @@ class ResultsSummaryView:
                     ft.DataCell(ft.Text(status_text, size=11, color=status_color, weight="bold")),
                 ]))
 
-            # 🔥 TABLA CON TODAS LAS COLUMNAS
+            #  TABLA CON TODAS LAS COLUMNAS
             meter_table = ft.DataTable(
                 columns=[
                     ft.DataColumn(ft.Text("Prueba", size=11, weight="bold")),
@@ -511,10 +511,10 @@ class ResultsSummaryView:
                 column_spacing=8,
             )
 
-            # 🔥 TARJETA DEL MEDIDOR CON ALTURA CONTROLADA
+            #  TARJETA DEL MEDIDOR CON ALTURA CONTROLADA
             meter_card = ft.Container(
                 content=ft.Column([
-                    # 🔥 HEADER DEL MEDIDOR CON MÁS INFORMACIÓN
+                    #  HEADER DEL MEDIDOR CON MÁS INFORMACIÓN
                     ft.Container(
                         content=ft.Column([
                             ft.Row([
@@ -523,7 +523,7 @@ class ResultsSummaryView:
                                         size=14, color="white", weight="bold"),
                             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                             
-                            # 🔥 ESTADÍSTICAS ADICIONALES DEL MEDIDOR
+                            #  ESTADÍSTICAS ADICIONALES DEL MEDIDOR
                             ft.Row([
                                 ft.Text(f"Aprobadas: {meter_data['passed_tests']}", size=12, color="white"),
                                 ft.Text(f"Reprobadas: {meter_data['failed_tests']}", size=12, color="white"),
@@ -535,10 +535,10 @@ class ResultsSummaryView:
                         border_radius=ft.border_radius.only(top_left=10, top_right=10),
                     ),
                     
-                    # 🔥 TABLA DE PRUEBAS CON ALTURA FIJA
+                    #  TABLA DE PRUEBAS CON ALTURA FIJA
                     ft.Container(
                         content=ft.Row([meter_table], scroll=ft.ScrollMode.AUTO),
-                        height=min(200, len(test_rows) * 35 + 60),  # 🔥 ALTURA MÁXIMA CONTROLADA
+                        height=min(200, len(test_rows) * 35 + 60),  #  ALTURA MÁXIMA CONTROLADA
                         padding=10,
                         border=ft.border.only(
                             left=ft.BorderSide(1, overall_color),
@@ -554,13 +554,13 @@ class ResultsSummaryView:
             meter_cards.append(meter_card)
 
         return ft.Column([
-            ft.Text("📋 Informe Detallado por Medidor Individual", size=18, weight="bold", color=ft.Colors.BLUE_700),
+            ft.Text(" Informe Detallado por Medidor Individual", size=18, weight="bold", color=ft.Colors.BLUE_700),
             ft.Text(f"Total de medidores probados: {len(meter_cards)}", size=14, color=ft.Colors.GREY_600),
             
-            # 🔥 DESCRIPCIÓN DE LAS COLUMNAS
+            #  DESCRIPCIÓN DE LAS COLUMNAS
             ft.Container(
                 content=ft.Column([
-                    ft.Text("📊 Campos del reporte:", size=14, weight="bold", color=ft.Colors.PURPLE_700),
+                    ft.Text(" Campos del reporte:", size=14, weight="bold", color=ft.Colors.PURPLE_700),
                     ft.Row([
                         ft.Text("• Prueba: Nombre de la prueba realizada", size=12, color=ft.Colors.GREY_600),
                         ft.Text("• Tipo: Q1, Q2, Q3 o Q4", size=12, color=ft.Colors.GREY_600),
@@ -580,20 +580,20 @@ class ResultsSummaryView:
                 margin=ft.margin.only(bottom=20),
             ),
             
-            # 🔥 CONTENEDOR CON LAS TARJETAS SIN EXPAND
+            #  CONTENEDOR CON LAS TARJETAS SIN EXPAND
             ft.Column(meter_cards, spacing=0),
         ], spacing=15)
 
     def _build_statistics(self):
-        """🔥 CONSTRUYE VISTA DE ESTADÍSTICAS"""
+        """ CONSTRUYE VISTA DE ESTADÍSTICAS"""
         return ft.Column([
             ft.Text("📈 Estadísticas Detalladas", size=18, weight="bold", color=ft.Colors.BLUE_700),
             ft.Text("🚧 Próximamente: Gráficos y análisis estadísticos", size=16, color=ft.Colors.GREY_600),
             
-            # 🔥 ESTADÍSTICAS BÁSICAS POR AHORA
+            #  ESTADÍSTICAS BÁSICAS POR AHORA
             ft.Container(
                 content=ft.Column([
-                    ft.Text("📊 Estadísticas Básicas", size=16, weight="bold", color=ft.Colors.PURPLE_700),
+                    ft.Text(" Estadísticas Básicas", size=16, weight="bold", color=ft.Colors.PURPLE_700),
                     ft.Row([
                         ft.Text(f"• Total de sesiones probadas: {self.total_groups}"),
                         ft.Text(f"• Promedio de medidores por sesión: {self.total_meters/max(self.total_groups,1):.1f}"),
@@ -610,11 +610,11 @@ class ResultsSummaryView:
         ], spacing=20)
 
     def _build_export_options(self):
-        """🔥 CONSTRUYE OPCIONES DE EXPORTACIÓN"""
+        """ CONSTRUYE OPCIONES DE EXPORTACIÓN"""
         return ft.Column([
             ft.Text("📁 Opciones de Exportación", size=18, weight="bold", color=ft.Colors.BLUE_700),
             
-            # 🔥 OPCIONES DE EXPORTACIÓN
+            #  OPCIONES DE EXPORTACIÓN
             ft.Container(
                 content=ft.Column([
                     ft.Text("Seleccione el formato de exportación:", size=14, weight="bold"),
@@ -645,7 +645,7 @@ class ResultsSummaryView:
                     
                     ft.Divider(height=20),
                     
-                    ft.Text("📋 El reporte incluirá:", size=14, weight="bold"),
+                    ft.Text(" El reporte incluirá:", size=14, weight="bold"),
                     ft.Column([
                         ft.Row([
                             ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN, size=16),
@@ -675,7 +675,7 @@ class ResultsSummaryView:
         ], spacing=20, horizontal_alignment="center")
 
     def _build_navigation_buttons(self):
-        """🔥 CONSTRUYE BOTONES DE NAVEGACIÓN"""
+        """ CONSTRUYE BOTONES DE NAVEGACIÓN"""
         return ft.Container(
             content=ft.Row([
                 ft.ElevatedButton(
@@ -715,7 +715,7 @@ class ResultsSummaryView:
         )
 
     def _build_error_view(self, error_message):
-        """🔥 CONSTRUYE VISTA DE ERROR"""
+        """ CONSTRUYE VISTA DE ERROR"""
         return ft.Container(
             content=ft.Column([
                 ft.Icon(ft.Icons.ERROR, size=64, color=ft.Colors.RED),
@@ -733,29 +733,29 @@ class ResultsSummaryView:
         )
 
     def _export_to_excel(self, e):
-        """🔥 EXPORTA A EXCEL CON SELECCIÓN DE UBICACIÓN"""
-        print("[RESULTS_SUMMARY] 📊 Iniciando exportación a Excel...")
+        """ EXPORTA A EXCEL CON SELECCIÓN DE UBICACIÓN"""
+        print("[RESULTS_SUMMARY]  Iniciando exportación a Excel...")
         
         def on_file_picker_result(result):
             if result.path:
                 try:
                     self._generate_excel_report(result.path)
-                    self._show_notification(f"📊 Excel generado exitosamente en: {result.path}")
+                    self._show_notification(f" Excel generado exitosamente en: {result.path}")
                 except Exception as ex:
-                    self._show_notification(f"❌ Error generando Excel: {str(ex)}")
+                    self._show_notification(f" Error generando Excel: {str(ex)}")
             else:
-                self._show_notification("❌ Exportación cancelada")
+                self._show_notification(" Exportación cancelada")
         
-        # 🔥 CREAR FILE PICKER
+        #  CREAR FILE PICKER
         file_picker = ft.FilePicker(
             on_result=on_file_picker_result
         )
         
-        # 🔥 AGREGAR AL OVERLAY DE LA PÁGINA
+        #  AGREGAR AL OVERLAY DE LA PÁGINA
         self.page.overlay.append(file_picker)
         self.page.update()
         
-        # 🔥 ABRIR DIÁLOGO PARA GUARDAR
+        #  ABRIR DIÁLOGO PARA GUARDAR
         file_picker.save_file(
             dialog_title="Guardar reporte Excel",
             file_name=f"Reporte_Medidores_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
@@ -763,7 +763,7 @@ class ResultsSummaryView:
         )
 
     def _export_to_pdf(self, e):
-        """🔥 EXPORTA A PDF CON SELECCIÓN DE UBICACIÓN"""
+        """ EXPORTA A PDF CON SELECCIÓN DE UBICACIÓN"""
         print("[RESULTS_SUMMARY] 📄 Iniciando exportación a PDF...")
         
         def on_file_picker_result(result):
@@ -772,20 +772,20 @@ class ResultsSummaryView:
                     self._generate_pdf_report(result.path)
                     self._show_notification(f"📄 PDF generado exitosamente en: {result.path}")
                 except Exception as ex:
-                    self._show_notification(f"❌ Error generando PDF: {str(ex)}")
+                    self._show_notification(f" Error generando PDF: {str(ex)}")
             else:
-                self._show_notification("❌ Exportación cancelada")
+                self._show_notification(" Exportación cancelada")
         
-        # 🔥 CREAR FILE PICKER
+        #  CREAR FILE PICKER
         file_picker = ft.FilePicker(
             on_result=on_file_picker_result
         )
         
-        # 🔥 AGREGAR AL OVERLAY DE LA PÁGINA
+        #  AGREGAR AL OVERLAY DE LA PÁGINA
         self.page.overlay.append(file_picker)
         self.page.update()
         
-        # 🔥 ABRIR DIÁLOGO PARA GUARDAR
+        #  ABRIR DIÁLOGO PARA GUARDAR
         file_picker.save_file(
             dialog_title="Guardar reporte PDF",
             file_name=f"Reporte_Medidores_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
@@ -793,18 +793,18 @@ class ResultsSummaryView:
         )
 
     def _generate_excel_report(self, file_path):
-        """🔥 GENERA REPORTE COMPLETO EN EXCEL"""
+        """ GENERA REPORTE COMPLETO EN EXCEL"""
         try:
             import pandas as pd
             from openpyxl import Workbook
             from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
             
-            # 🔥 CREAR WORKBOOK
+            #  CREAR WORKBOOK
             wb = Workbook()
             ws = wb.active
             ws.title = "Reporte de Pruebas"
             
-            # 🔥 CONFIGURAR ESTILOS
+            #  CONFIGURAR ESTILOS
             header_font = Font(bold=True, color="FFFFFF")
             header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
             data_font = Font(size=10)
@@ -817,14 +817,14 @@ class ResultsSummaryView:
             
             row = 1
             
-            # 🔥 TÍTULO PRINCIPAL
+            #  TÍTULO PRINCIPAL
             ws.merge_cells(f'A{row}:H{row}')
             ws[f'A{row}'] = "REPORTE DE PRUEBAS DE MEDIDORES"
             ws[f'A{row}'].font = Font(bold=True, size=16)
             ws[f'A{row}'].alignment = Alignment(horizontal='center')
             row += 2
             
-            # 🔥 INFORMACIÓN DE LA SESIÓN
+            #  INFORMACIÓN DE LA SESIÓN
             batch_info = self.summary_data.get("batch_info", {})
             session_info = [
                 ("Fecha del Reporte:", datetime.now().strftime("%d/%m/%Y %H:%M:%S")),
@@ -848,7 +848,7 @@ class ResultsSummaryView:
             
             row += 2
             
-            # 🔥 ESTADÍSTICAS GENERALES
+            #  ESTADÍSTICAS GENERALES
             ws.merge_cells(f'A{row}:H{row}')
             ws[f'A{row}'] = "ESTADÍSTICAS GENERALES"
             ws[f'A{row}'].font = header_font
@@ -871,7 +871,7 @@ class ResultsSummaryView:
             
             row += 2
             
-            # 🔥 DETALLES POR GRUPO DE PRUEBAS
+            #  DETALLES POR GRUPO DE PRUEBAS
             for test_group in self.completed_tests:
                 # Header del grupo
                 ws.merge_cells(f'A{row}:H{row}')
@@ -922,14 +922,14 @@ class ResultsSummaryView:
                 
                 row += 1  # Espacio entre grupos
             
-            # 🔥 AJUSTAR ANCHO DE COLUMNAS
+            #  AJUSTAR ANCHO DE COLUMNAS
             column_widths = [5, 15, 15, 15, 15, 15, 12, 12]
             for col, width in enumerate(column_widths, 1):
                 ws.column_dimensions[chr(64 + col)].width = width
             
-            # 🔥 GUARDAR ARCHIVO
+            #  GUARDAR ARCHIVO
             wb.save(file_path)
-            print(f"[RESULTS_SUMMARY] ✅ Excel generado en: {file_path}")
+            print(f"[RESULTS_SUMMARY]  Excel generado en: {file_path}")
             
         except ImportError:
             raise Exception("Se requiere instalar 'pandas' y 'openpyxl' para exportar a Excel:\npip install pandas openpyxl")
@@ -937,7 +937,7 @@ class ResultsSummaryView:
             raise Exception(f"Error generando Excel: {str(e)}")
 
     def _generate_pdf_report(self, file_path):
-        """🔥 GENERA REPORTE COMPLETO EN PDF"""
+        """ GENERA REPORTE COMPLETO EN PDF"""
         try:
             from reportlab.lib.pagesizes import letter, A4
             from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
@@ -945,12 +945,12 @@ class ResultsSummaryView:
             from reportlab.lib import colors
             from reportlab.lib.units import inch
             
-            # 🔥 CREAR DOCUMENTO
+            #  CREAR DOCUMENTO
             doc = SimpleDocTemplate(file_path, pagesize=A4, topMargin=0.5*inch)
             styles = getSampleStyleSheet()
             story = []
             
-            # 🔥 TÍTULO
+            #  TÍTULO
             title_style = ParagraphStyle(
                 'CustomTitle',
                 parent=styles['Heading1'],
@@ -960,7 +960,7 @@ class ResultsSummaryView:
             )
             story.append(Paragraph("REPORTE DE PRUEBAS DE MEDIDORES", title_style))
             
-            # 🔥 INFORMACIÓN DE LA SESIÓN
+            #  INFORMACIÓN DE LA SESIÓN
             batch_info = self.summary_data.get("batch_info", {})
             session_data = [
                 ["Fecha del Reporte:", datetime.now().strftime("%d/%m/%Y %H:%M:%S")],
@@ -988,7 +988,7 @@ class ResultsSummaryView:
             story.append(session_table)
             story.append(Spacer(1, 20))
             
-            # 🔥 ESTADÍSTICAS GENERALES
+            #  ESTADÍSTICAS GENERALES
             story.append(Paragraph("ESTADÍSTICAS GENERALES", styles['Heading2']))
             stats_data = [
                 ["Total Grupos de Pruebas:", str(self.total_groups)],
@@ -1010,7 +1010,7 @@ class ResultsSummaryView:
             story.append(stats_table)
             story.append(Spacer(1, 20))
             
-            # 🔥 DETALLES POR GRUPO
+            #  DETALLES POR GRUPO
             for test_group in self.completed_tests:
                 story.append(Paragraph(f"GRUPO: {test_group['test_name']}", styles['Heading3']))
                 
@@ -1048,9 +1048,9 @@ class ResultsSummaryView:
                 story.append(table)
                 story.append(Spacer(1, 15))
             
-            # 🔥 GENERAR PDF
+            #  GENERAR PDF
             doc.build(story)
-            print(f"[RESULTS_SUMMARY] ✅ PDF generado en: {file_path}")
+            print(f"[RESULTS_SUMMARY]  PDF generado en: {file_path}")
             
         except ImportError:
             raise Exception("Se requiere instalar 'reportlab' para exportar a PDF:\npip install reportlab")
@@ -1058,8 +1058,8 @@ class ResultsSummaryView:
             raise Exception(f"Error generando PDF: {str(e)}")
 
     def _start_new_session(self, e):
-        """🔥 INICIA NUEVA SESIÓN"""
-        print("[RESULTS_SUMMARY] 🔄 Iniciando nueva sesión...")
+        """ INICIA NUEVA SESIÓN"""
+        print("[RESULTS_SUMMARY]  Iniciando nueva sesión...")
         try:
             from views.batch_registration_view import get_batch_registration_view
             
@@ -1069,11 +1069,11 @@ class ResultsSummaryView:
             self.page.update()
             
         except Exception as error:
-            print(f"[RESULTS_SUMMARY] ❌ Error iniciando nueva sesión: {error}")
-            self._show_notification("❌ Error iniciando nueva sesión")
+            print(f"[RESULTS_SUMMARY]  Error iniciando nueva sesión: {error}")
+            self._show_notification(" Error iniciando nueva sesión")
 
     def _go_to_home(self, e):
-        """🔥 VA AL INICIO"""
+        """ VA AL INICIO"""
         print("[RESULTS_SUMMARY] 🏠 Volviendo al inicio...")
         try:
             from main import main_menu
@@ -1084,17 +1084,17 @@ class ResultsSummaryView:
             self.page.update()
             
         except Exception as error:
-            print(f"[RESULTS_SUMMARY] ❌ Error volviendo al inicio: {error}")
-            self._show_notification("❌ Error volviendo al inicio")
+            print(f"[RESULTS_SUMMARY]  Error volviendo al inicio: {error}")
+            self._show_notification(" Error volviendo al inicio")
 
     def _print_report(self, e):
-        """🔥 IMPRIME EL REPORTE"""
+        """ IMPRIME EL REPORTE"""
         print("[RESULTS_SUMMARY] 🖨️ Imprimiendo reporte...")
         # TODO: Implementar impresión
         self._show_notification("🖨️ Función de impresión en desarrollo")
 
     def _show_notification(self, message):
-        """🔥 MUESTRA NOTIFICACIÓN"""
+        """ MUESTRA NOTIFICACIÓN"""
         snack_bar = ft.SnackBar(
             content=ft.Text(message),
             duration=3000,
@@ -1105,15 +1105,15 @@ class ResultsSummaryView:
 
 
 def get_results_summary_view(page, summary_data):
-    """🔥 FUNCIÓN PRINCIPAL PARA OBTENER LA VISTA DE RESUMEN"""
+    """ FUNCIÓN PRINCIPAL PARA OBTENER LA VISTA DE RESUMEN"""
     try:
-        print("[RESULTS_SUMMARY] 🚀 Creando vista de resumen de resultados...")
+        print("[RESULTS_SUMMARY]  Creando vista de resumen de resultados...")
         view = ResultsSummaryView(page, summary_data)
         built_view = view.build()
-        print("[RESULTS_SUMMARY] ✅ Vista de resumen creada exitosamente")
+        print("[RESULTS_SUMMARY]  Vista de resumen creada exitosamente")
         return built_view
     except Exception as e:
-        print(f"[RESULTS_SUMMARY] ❌ Error creando vista: {e}")
+        print(f"[RESULTS_SUMMARY]  Error creando vista: {e}")
         return ft.Container(
             content=ft.Column([
                 ft.Text("Error creando vista de resumen", size=20, color=ft.Colors.RED, weight="bold"),

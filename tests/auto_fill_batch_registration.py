@@ -18,7 +18,7 @@ class AutoFillBot:
             thread = threading.Thread(target=self.run_automation, daemon=True)
             thread.start()
         else:
-            self.progress.value = "⚠️ El bot ya está en ejecución"
+            self.progress.value = " El bot ya está en ejecución"
             self.page.update()
 
     def run_automation(self):
@@ -42,11 +42,11 @@ class AutoFillBot:
             # ---- 4. Seleccionar modo ----
             self._select_radio("operation_radio", "automatic")
             
-            self._update_status("✅ Formulario completado!", ft.Colors.GREEN)
+            self._update_status(" Formulario completado!", ft.Colors.GREEN)
             time.sleep(2)
             
         except Exception as e:
-            self._update_status(f"❌ Error: {str(e)}", ft.Colors.RED)
+            self._update_status(f" Error: {str(e)}", ft.Colors.RED)
         finally:
             self.running = False
 

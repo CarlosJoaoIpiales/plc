@@ -3,7 +3,7 @@
 from services.db_service import fetch_all_clients, insert_client
 
 def get_all_clients():
-    return fetch_all_clients()  # ✅ retorna [{ "id": 1, "name": "CARLOS" }, ...]
+    return fetch_all_clients()  #  retorna [{ "id": 1, "name": "CARLOS" }, ...]
 
 def add_client(client_data):
     """Agrega un nuevo cliente - acepta string (compatibilidad) o dict (completo)"""
@@ -13,14 +13,14 @@ def add_client(client_data):
         conn = connect()
         cursor = conn.cursor()
         
-        # 🔥 MANEJAR AMBOS FORMATOS PARA COMPATIBILIDAD
+        #  MANEJAR AMBOS FORMATOS PARA COMPATIBILIDAD
         if isinstance(client_data, str):
             # Formato viejo: solo nombre
             cursor.execute(
                 "INSERT INTO clients (name) VALUES (%s) RETURNING id",
                 (client_data,)
             )
-            print(f"[CLIENT_CTRL] ✅ Cliente guardado (solo nombre): {client_data}")
+            print(f"[CLIENT_CTRL]  Cliente guardado (solo nombre): {client_data}")
         
         elif isinstance(client_data, dict):
             # Formato nuevo: diccionario completo
@@ -33,7 +33,7 @@ def add_client(client_data):
                     client_data.get("email", "")
                 )
             )
-            print(f"[CLIENT_CTRL] ✅ Cliente completo guardado: {client_data['name']}")
+            print(f"[CLIENT_CTRL]  Cliente completo guardado: {client_data['name']}")
             print(f"[CLIENT_CTRL] 📞 Teléfono: {client_data.get('phone', 'N/A')}")
             print(f"[CLIENT_CTRL] 📍 Dirección: {client_data.get('address', 'N/A')}")
             print(f"[CLIENT_CTRL] 📧 Email: {client_data.get('email', 'N/A')}")
@@ -48,7 +48,7 @@ def add_client(client_data):
         return client_id
         
     except Exception as e:
-        print(f"[CLIENT_CTRL] ❌ Error agregando cliente: {e}")
+        print(f"[CLIENT_CTRL]  Error agregando cliente: {e}")
         if conn:
             conn.rollback()
         raise e

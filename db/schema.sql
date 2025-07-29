@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS meter_groups (
     nominal_flow NUMERIC,
     diameter NUMERIC,
     type VARCHAR(50),
-    batch VARCHAR(10) CHECK (batch IN ('new', 'used', 'nuevo', 'usado')), -- 🔥 AGREGAR ESPAÑOL
+    batch VARCHAR(10) CHECK (batch IN ('new', 'used', 'nuevo', 'usado')), --  AGREGAR ESPAÑOL
     client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
     technician_id INTEGER REFERENCES technicians(id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -31,9 +31,9 @@ CREATE TABLE IF NOT EXISTS meter_groups (
 -- Table: meters
 CREATE TABLE IF NOT EXISTS meters (
     id SERIAL PRIMARY KEY,
-    serial_number VARCHAR(100) NOT NULL, -- 🔥 QUITAR UNIQUE AQUÍ
+    serial_number VARCHAR(100) NOT NULL, --  QUITAR UNIQUE AQUÍ
     meter_group_id INTEGER REFERENCES meter_groups(id) ON DELETE CASCADE,
-    UNIQUE(serial_number, meter_group_id) -- 🔥 UNIQUE COMPUESTO PARA PERMITIR MISMO SERIAL EN DIFERENTES GRUPOS
+    UNIQUE(serial_number, meter_group_id) --  UNIQUE COMPUESTO PARA PERMITIR MISMO SERIAL EN DIFERENTES GRUPOS
 );
 
 -- Table: tests
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS tests (
     test_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 🔥 ÍNDICES ADICIONALES PARA MEJOR RENDIMIENTO
+--  ÍNDICES ADICIONALES PARA MEJOR RENDIMIENTO
 CREATE INDEX IF NOT EXISTS idx_meters_serial ON meters(serial_number);
 CREATE INDEX IF NOT EXISTS idx_meters_group ON meters(meter_group_id);
 CREATE INDEX IF NOT EXISTS idx_tests_meter ON tests(meter_id);

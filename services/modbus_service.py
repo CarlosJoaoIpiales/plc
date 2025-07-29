@@ -42,7 +42,7 @@ class ModbusService:
                 if result_queue:
                     result_queue.put(result)
             except Exception as ex:
-                #print(f"[ModbusService] ❌ Error procesando comando: {ex}")
+                #print(f"[ModbusService]  Error procesando comando: {ex}")
                 if result_queue:
                     result_queue.put(None)
             #print(f"[ModbusService] Comando finalizado: {func.__name__}")
@@ -109,7 +109,7 @@ class ModbusService:
                 response = self.serial_port.read(100)
                 return response
         except Exception as e:
-            print(f"❌ Error sending command: {str(e)}")
+            print(f" Error sending command: {str(e)}")
             return
 
     def start_read_loop(self, slave, update_ui_callback):
@@ -186,14 +186,14 @@ class ModbusService:
                 "Reiniciar": "M263"
             }
             if name not in button_mapping:
-                print(f"[send_boolean] ❌ Botón '{name}' no encontrado en mapeo. Disponibles: {list(button_mapping.keys())}")
+                print(f"[send_boolean]  Botón '{name}' no encontrado en mapeo. Disponibles: {list(button_mapping.keys())}")
                 return False
             address_str = button_mapping[name]
             print(f"[send_boolean] [MODBUS] Enviando {name} -> {address_str} = {value}")
             info = get_address('M', int(address_str[1:]))
             print(f"[send_boolean] Dirección obtenida: {info}")
             if not info:
-                print(f"[send_boolean] ❌ No se pudo obtener información para {address_str}")
+                print(f"[send_boolean]  No se pudo obtener información para {address_str}")
                 return False
             def send_single_command(val):
                 print(f"[send_boolean] Preparando comando para valor: {val}")
@@ -214,9 +214,9 @@ class ModbusService:
             response = send_single_command(value)
             print(f"[send_boolean] Respuesta tras enviar valor principal: {response}")
             if not response:
-                print(f"[send_boolean] [MODBUS] ❌ Error enviando {name} = {value}")
+                print(f"[send_boolean] [MODBUS]  Error enviando {name} = {value}")
                 return False
-            print(f"[send_boolean] [MODBUS] ✅ {name} = {value} enviado correctamente")
+            print(f"[send_boolean] [MODBUS]  {name} = {value} enviado correctamente")
             if value:
                 print(f"[send_boolean] Esperando 0.1s antes de enviar FALSE automático...")
                 time.sleep(0.1)
@@ -224,11 +224,11 @@ class ModbusService:
                 response_false = send_single_command(False)
                 print(f"[send_boolean] Respuesta tras enviar FALSE automático: {response_false}")
                 if response_false:
-                    print(f"[send_boolean] [MODBUS] ✅ {name} = False enviado automáticamente (botón momentáneo)")
+                    print(f"[send_boolean] [MODBUS]  {name} = False enviado automáticamente (botón momentáneo)")
                 else:
-                    print(f"[send_boolean] [MODBUS] ⚠️ Error enviando {name} = False automático")
+                    print(f"[send_boolean] [MODBUS]  Error enviando {name} = False automático")
             print(f"[send_boolean] FIN OK")
             return True
         except Exception as ex:
-            print(f"[send_boolean] ❌ Error en send_boolean para '{name}': {ex}")
+            print(f"[send_boolean]  Error en send_boolean para '{name}': {ex}")
             return False

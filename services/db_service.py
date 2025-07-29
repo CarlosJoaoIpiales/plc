@@ -169,11 +169,11 @@ def fetch_report_for_serial(serial_number):
         conn.close()
 
 def _save_session_to_database(self):
-    """🔥 GUARDA TODA LA SESIÓN EN LA BASE DE DATOS USANDO TU ESQUEMA EXACTO"""
+    """ GUARDA TODA LA SESIÓN EN LA BASE DE DATOS USANDO TU ESQUEMA EXACTO"""
     try:
         print("[TEST_TABLE] 💾 Guardando sesión en base de datos PostgreSQL...")
         
-        # 🔥 IMPORTAR TU SERVICIO DE BD
+        #  IMPORTAR TU SERVICIO DE BD
         from services.db_service import (
             insert_client, fetch_all_clients,
             insert_technician, fetch_all_technicians,
@@ -181,10 +181,10 @@ def _save_session_to_database(self):
             save_test_for_meter, get_existing_test_count
         )
         
-        # 🔥 OBTENER DATOS DE LA SESIÓN
+        #  OBTENER DATOS DE LA SESIÓN
         session_data = self._get_session_data()
         
-        # 🔥 PASO 1: OBTENER/CREAR CLIENTE
+        #  PASO 1: OBTENER/CREAR CLIENTE
         client_name = session_data.get("client_name", "Cliente Desconocido")
         print(f"[TEST_TABLE] 👤 Procesando cliente: {client_name}")
         
@@ -199,11 +199,11 @@ def _save_session_to_database(self):
         # Crear cliente si no existe
         if not client_id:
             client_id = insert_client(client_name)
-            print(f"[TEST_TABLE] ✅ Cliente creado: {client_name} (ID: {client_id})")
+            print(f"[TEST_TABLE]  Cliente creado: {client_name} (ID: {client_id})")
         else:
-            print(f"[TEST_TABLE] ✅ Cliente existente: {client_name} (ID: {client_id})")
+            print(f"[TEST_TABLE]  Cliente existente: {client_name} (ID: {client_id})")
         
-        # 🔥 PASO 2: OBTENER/CREAR TÉCNICO
+        #  PASO 2: OBTENER/CREAR TÉCNICO
         technician_name = session_data.get("technician_name", "Técnico Desconocido")
         print(f"[TEST_TABLE] 🔧 Procesando técnico: {technician_name}")
         
@@ -218,11 +218,11 @@ def _save_session_to_database(self):
         # Crear técnico si no existe
         if not technician_id:
             technician_id = insert_technician(technician_name)
-            print(f"[TEST_TABLE] ✅ Técnico creado: {technician_name} (ID: {technician_id})")
+            print(f"[TEST_TABLE]  Técnico creado: {technician_name} (ID: {technician_id})")
         else:
-            print(f"[TEST_TABLE] ✅ Técnico existente: {technician_name} (ID: {technician_id})")
+            print(f"[TEST_TABLE]  Técnico existente: {technician_name} (ID: {technician_id})")
         
-        # 🔥 PASO 3: CREAR GRUPO DE MEDIDORES (SESIÓN) - USANDO TU ESQUEMA
+        #  PASO 3: CREAR GRUPO DE MEDIDORES (SESIÓN) - USANDO TU ESQUEMA
         meter_group_data = {
             "brand": session_data.get("brand", "Marca Desconocida")[:50],  # Limitar a 50 chars
             "model": session_data.get("model", "Modelo Desconocido")[:50],
@@ -230,13 +230,13 @@ def _save_session_to_database(self):
             "nominal_flow": float(session_data.get("nominal_flow", 1000)),
             "diameter": float(session_data.get("diameter", 20)),
             "type": session_data.get("type", "Tipo Desconocido")[:50],
-            "batch": self._normalize_batch_value(session_data.get("batch", "nuevo")),  # 🔥 NORMALIZAR
+            "batch": self._normalize_batch_value(session_data.get("batch", "nuevo")),  #  NORMALIZAR
         }
         
         meter_group_id = insert_meter_group(meter_group_data, client_id, technician_id)
-        print(f"[TEST_TABLE] ✅ Grupo de medidores creado (ID: {meter_group_id})")
+        print(f"[TEST_TABLE]  Grupo de medidores creado (ID: {meter_group_id})")
         
-        # 🔥 PASO 4: GUARDAR MEDIDORES Y PRUEBAS
+        #  PASO 4: GUARDAR MEDIDORES Y PRUEBAS
         saved_tests_count = 0
         saved_meters_count = 0
         processed_serials = set()
@@ -248,18 +248,18 @@ def _save_session_to_database(self):
                 try:
                     serial_number = str(result["serial_number"]).strip()[:100]  # Limitar a 100 chars
                     
-                    # 🔥 CREAR/OBTENER MEDIDOR (USANDO TU ESQUEMA)
+                    #  CREAR/OBTENER MEDIDOR (USANDO TU ESQUEMA)
                     meter_id = save_meter_if_not_exists(serial_number, meter_group_id)
                     if meter_id and serial_number not in processed_serials:
                         saved_meters_count += 1
                         processed_serials.add(serial_number)
                         print(f"[TEST_TABLE] 📏 Medidor procesado: {serial_number} (ID: {meter_id})")
                     
-                    # 🔥 DETERMINAR NÚMERO DE PRUEBA AUTOMÁTICAMENTE
+                    #  DETERMINAR NÚMERO DE PRUEBA AUTOMÁTICAMENTE
                     existing_count = get_existing_test_count(serial_number, test_group["test_type"])
                     test_number = existing_count + 1
                     
-                    # 🔥 PREPARAR DATOS DE LA PRUEBA (USANDO TU ESQUEMA EXACTO)
+                    #  PREPARAR DATOS DE LA PRUEBA (USANDO TU ESQUEMA EXACTO)
                     test_data = {
                         "test_type": str(test_group["test_type"])[:10],  # Limitar a 10 chars
                         "test_number": int(test_number),
@@ -270,35 +270,35 @@ def _save_session_to_database(self):
                         "passed": bool(result["is_passed"])
                     }
                     
-                    # 🔥 GUARDAR PRUEBA EN BD
+                    #  GUARDAR PRUEBA EN BD
                     save_test_for_meter(meter_id, test_data)
                     saved_tests_count += 1
                     
-                    print(f"[TEST_TABLE] ✅ Prueba guardada: {serial_number} - {test_group['test_type']} #{test_number}")
+                    print(f"[TEST_TABLE]  Prueba guardada: {serial_number} - {test_group['test_type']} #{test_number}")
                     
                 except Exception as e:
-                    print(f"[TEST_TABLE] ❌ Error guardando resultado individual: {e}")
-                    print(f"[TEST_TABLE] 📋 Datos del resultado: {result}")
+                    print(f"[TEST_TABLE]  Error guardando resultado individual: {e}")
+                    print(f"[TEST_TABLE]  Datos del resultado: {result}")
                     import traceback
                     traceback.print_exc()
         
-        print(f"[TEST_TABLE] ✅ Sesión guardada completamente en PostgreSQL")
-        print(f"[TEST_TABLE] 📊 Estadísticas finales:")
+        print(f"[TEST_TABLE]  Sesión guardada completamente en PostgreSQL")
+        print(f"[TEST_TABLE]  Estadísticas finales:")
         print(f"  • Grupo ID: {meter_group_id}")
         print(f"  • Medidores únicos procesados: {saved_meters_count}")
         print(f"  • Pruebas guardadas: {saved_tests_count}")
         print(f"  • Cliente: {client_name} (ID: {client_id})")
         print(f"  • Técnico: {technician_name} (ID: {technician_id})")
         
-        return meter_group_id  # 🔥 RETORNAR ID DE LA SESIÓN
+        return meter_group_id  #  RETORNAR ID DE LA SESIÓN
         
     except Exception as e:
-        print(f"[TEST_TABLE] ❌ Error crítico guardando en PostgreSQL: {e}")
+        print(f"[TEST_TABLE]  Error crítico guardando en PostgreSQL: {e}")
         import traceback
         traceback.print_exc()
         raise Exception(f"Error guardando en base de datos: {str(e)}")
 def _normalize_batch_value(self, batch_value):
-    """🔥 NORMALIZA EL VALOR DE BATCH PARA QUE COINCIDA CON TU ESQUEMA"""
+    """ NORMALIZA EL VALOR DE BATCH PARA QUE COINCIDA CON TU ESQUEMA"""
     if not batch_value:
         return "new"
     
@@ -310,12 +310,12 @@ def _normalize_batch_value(self, batch_value):
     elif batch_lower in ["usado", "used"]:
         return "used"
     else:
-        print(f"[TEST_TABLE] ⚠️ Valor de batch desconocido: {batch_value}, usando 'new'")
+        print(f"[TEST_TABLE]  Valor de batch desconocido: {batch_value}, usando 'new'")
         return "new"
 def _get_session_data(self):
-    """🔥 OBTIENE DATOS DE LA SESIÓN CON VALORES POR DEFECTO SEGUROS"""
+    """ OBTIENE DATOS DE LA SESIÓN CON VALORES POR DEFECTO SEGUROS"""
     try:
-        # 🔥 INTENTAR OBTENER DESDE PÁGINA
+        #  INTENTAR OBTENER DESDE PÁGINA
         if hasattr(self, 'page') and self.page and hasattr(self.page, 'session'):
             return {
                 "client_name": getattr(self.page, 'client_name', 'Cliente Desconocido'),
@@ -329,7 +329,7 @@ def _get_session_data(self):
                 "batch": getattr(self.page, 'batch', 'nuevo'),
             }
         
-        # 🔥 DATOS POR DEFECTO SEGUROS
+        #  DATOS POR DEFECTO SEGUROS
         return {
             "client_name": "Cliente Desconocido",
             "technician_name": "Técnico Desconocido", 
@@ -343,7 +343,7 @@ def _get_session_data(self):
         }
         
     except Exception as e:
-        print(f"[TEST_TABLE] ❌ Error obteniendo datos de sesión: {e}")
+        print(f"[TEST_TABLE]  Error obteniendo datos de sesión: {e}")
         return {
             "client_name": "Cliente Desconocido",
             "technician_name": "Técnico Desconocido", 

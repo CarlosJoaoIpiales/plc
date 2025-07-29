@@ -11,7 +11,7 @@ class TimerModule:
         self.start_time = 0
         self.timer_thread = None
         
-        # 🔥 ELEMENTO UI COMPACTO - SOLO UNA LÍNEA
+        #  ELEMENTO UI COMPACTO - SOLO UNA LÍNEA
         self.time_display = ft.Text(
             "Tiempo restante: 00:00",
             size=14,
@@ -28,16 +28,37 @@ class TimerModule:
         
     def start_countdown(self):
         """Inicia la cuenta regresiva"""
+        print(f"[TIMER]  Intentando iniciar countdown...")
+        print(f"[TIMER]  Estado actual: is_running={self.is_running}, remaining_time={self.remaining_time}")
+        
         if self.is_running:
+            print(f"[TIMER]  Timer ya está corriendo")
+            return
+        
+        if self.remaining_time <= 0:
+            print(f"[TIMER]  No hay tiempo configurado")
             return
             
         self.is_running = True
         self.start_time = time.time()
         
+        print(f"[TIMER]  Timer marcado como running")
+        print(f"[TIMER]  Tiempo configurado: {self.total_time} segundos")
+        print(f"[TIMER]  Tiempo restante: {self.remaining_time} segundos")
+        
         # Iniciar thread del timer
-        self.timer_thread = threading.Thread(target=self._countdown_loop)
-        self.timer_thread.daemon = True
-        self.timer_thread.start()
+        try:
+            self.timer_thread = threading.Thread(target=self._countdown_loop)
+            self.timer_thread.daemon = True
+            self.timer_thread.start()
+            print(f"[TIMER] 🧵 Thread iniciado exitosamente")
+        except Exception as e:
+            print(f"[TIMER]  Error iniciando thread: {e}")
+            self.is_running = False
+            return
+        
+        # Actualizar display inmediatamente
+        self.update_display()
         
     def stop_countdown(self):
         """Detiene la cuenta regresiva"""
@@ -46,7 +67,14 @@ class TimerModule:
         
     def _countdown_loop(self):
         """Loop principal del countdown"""
+        print(f"[TIMER]  Iniciando loop de countdown...")
+        
+        loop_count = 0
         while self.is_running and self.remaining_time > 0:
+            loop_count += 1
+            if loop_count % 10 == 0:  # Log cada 10 segundos
+                print(f"[TIMER]  Loop #{loop_count}: {self.remaining_time} segundos restantes")
+            
             elapsed = time.time() - self.start_time
             self.remaining_time = max(0, self.total_time - int(elapsed))
             
@@ -54,20 +82,31 @@ class TimerModule:
             try:
                 self.update_display()
                 time.sleep(1)
-            except:
+            except Exception as e:
+                print(f"[TIMER]  Error en loop: {e}")
                 break
                 
+        print(f"[TIMER] 🏁 Loop terminado. Tiempo restante: {self.remaining_time}")
+        
         if self.remaining_time <= 0 and self.is_running:
+            print(f"[TIMER] ⏰ Tiempo completado, ejecutando callback")
             self.is_running = False
             self.update_display()
-            self.on_timer_finished()
+            
+            # Ejecutar callback de finalización
+            try:
+                if self.on_timer_finished:
+                    self.on_timer_finished()
+                    print(f"[TIMER]  Callback ejecutado")
+            except Exception as e:
+                print(f"[TIMER]  Error en callback: {e}")
             
     def update_display(self):
-        """🔥 ACTUALIZA SOLO EL TEXTO COMPACTO"""
+        """ ACTUALIZA SOLO EL TEXTO COMPACTO"""
         minutes = self.remaining_time // 60
         seconds = self.remaining_time % 60
         
-        # 🔥 FORMATO SIMPLE: "Tiempo restante: MM:SS"
+        #  FORMATO SIMPLE: "Tiempo restante: MM:SS"
         time_str = f"{minutes:02d}:{seconds:02d}"
         
         if self.is_running:
@@ -99,7 +138,7 @@ class TimerModule:
         return 0
         
     def build(self):
-        """🔥 CONSTRUYE EL MÓDULO COMPACTO - SOLO UNA FILA"""
+        """ CONSTRUYE EL MÓDULO COMPACTO - SOLO UNA FILA"""
         return self.time_display
 
 def create_timer_module(on_timer_finished):

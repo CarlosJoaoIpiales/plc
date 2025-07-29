@@ -17,7 +17,7 @@ def get_connection_view(page, on_connection_ready):
             print(f"[CONNECTION_VIEW] Puerto COM abierto: {port}")
             on_connection_ready()
         else:
-            update_status("❌ No se pudo abrir el puerto COM")
+            update_status(" No se pudo abrir el puerto COM")
             print("[CONNECTION_VIEW] No se pudo abrir el puerto COM")
 
     monitor_com_connection(on_ready, update_status)
