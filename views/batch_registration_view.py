@@ -603,11 +603,36 @@ def get_batch_registration_view(page, on_continue):
         progress_details = ft.Text("Iniciando comunicación...", size=12, text_align="center", color=ft.Colors.GREY_600)
 
         def confirm_and_send_data(e):
-            """Confirma y envía datos al PLC con indicador de progreso detallado - VERSIÓN CORREGIDA"""
+            """Confirma y envía datos al PLC con indicador de progreso detallado"""
             confirm_dialog.open = False
             page.update()
-            
-            #  GUARDAR TODOS LOS DATOS EN LA PÁGINA PARA ACCESO POSTERIOR
+        
+            # --- VALIDACIÓN DE MEDIDORES COMPLETOS ---
+            meter_errors, valid_meters = meter_table.validate_meters()
+            if meter_errors or not valid_meters:
+                error_text = "Debe ingresar al menos un medidor y completar todos los campos (serial y lectura de ingreso) en cada fila.\n\n"
+                if meter_errors:
+                    error_text += "\n".join(meter_errors)
+                else:
+                    error_text += "No hay medidores válidos ingresados."
+        
+                def close_meter_error_dialog(ev):
+                    meter_error_dialog.open = False
+                    page.update()
+        
+                meter_error_dialog = ft.AlertDialog(
+                    title=ft.Text("Error en Medidores"),
+                    content=ft.Text(error_text),
+                    actions=[ft.TextButton("Corregir", on_click=close_meter_error_dialog)],
+                )
+                page.overlay.append(meter_error_dialog)
+                meter_error_dialog.open = True
+                page.update()
+                return
+            # --- FIN VALIDACIÓN DE MEDIDORES ---
+        
+            # ...el resto de tu función sigue igual...
+            # GUARDAR TODOS LOS DATOS EN LA PÁGINA PARA ACCESO POSTERIOR
             page.client_name = client_name
             page.technician_name = technician_name
             page.brand = brand.value
@@ -617,7 +642,7 @@ def get_batch_registration_view(page, on_continue):
             page.diameter = diameter.value
             page.meter_type = meter_type.value
             page.batch = batch.value
-            
+        
             print(f"[BATCH_REG] 💾 Datos guardados en página:")
             print(f"  • Cliente: {client_name}")
             print(f"  • Técnico: {technician_name}")
